@@ -8,6 +8,7 @@ import {
   endOfWeek,
   endOfYear,
   format,
+  isSameDay,
   isSameMonth,
   parseISO,
   startOfDay,
@@ -41,6 +42,8 @@ import { DateTimePickerField } from "./DateTimePickerField";
 import { EventColorField } from "./EventColorField";
 
 type ScratchTodoRow = { id: string; text: string; done: boolean; createdAt: string };
+
+const ZOOM_TRANSITION = { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const };
 
 export function CalendarApp() {
   const router = useRouter();
@@ -267,8 +270,8 @@ export function CalendarApp() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#0c0b09] text-[#f4eee6]">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2a2622] px-4 py-3">
-        <div>
+      <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-[#2a2622] px-4 py-3">
+        <div className="min-w-0 justify-self-start">
           <button
             type="button"
             onClick={() => {
@@ -283,7 +286,13 @@ export function CalendarApp() {
             </span>
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <p
+          className="pointer-events-none shrink-0 justify-self-center font-[family-name:var(--font-display)] text-lg font-medium tabular-nums tracking-tight text-[#a0988c] sm:text-xl"
+          aria-live="polite"
+        >
+          {format(anchor, "yyyy")}
+        </p>
+        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 justify-self-end">
           <button type="button" onClick={() => setCreateOpen(true)} className={btnPrimarySm}>
             + Termin
           </button>
@@ -307,7 +316,7 @@ export function CalendarApp() {
             Steht bevor
           </p>
           <p className="mb-2 text-[10px] leading-snug text-[#6b645c]">
-            {format(new Date(), "MMMM yyyy", { locale: de })}
+            {format(new Date(), "MMMM", { locale: de })}
           </p>
           <ul className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-8rem))]">
             {monthAgenda.length === 0 ? (
@@ -378,40 +387,52 @@ export function CalendarApp() {
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
             className={`flex h-full min-h-0 flex-col p-2 sm:p-3 ${band === "year" ? "overflow-hidden" : ""}`}
           >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={band + format(anchor, "yyyy-MM-dd")}
-                initial={{ opacity: 0, scale: 0.985 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.012 }}
-                transition={{ duration: 0.22 }}
-                className={`min-h-0 w-full ${band === "year" ? "flex flex-1 flex-col overflow-hidden" : "h-full"}`}
-              >
-                {loading && events.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-[#8a8278]">
-                    Lade…
-                  </div>
-                ) : (
-                  <BandView
-                    band={band}
-                    anchor={anchor}
-                    events={events}
-                    dayCounts={dayCounts}
-                    onHoverDate={(d) => {
-                      hoverFocusRef.current = d;
-                    }}
-                    onZoomFinerFrom={zoomFinerFrom}
-                    onOpenDayFromYearView={openDayFromYearView}
-                    onSelect={setSelected}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+            <div className="relative min-h-0 w-full flex-1">
+              <AnimatePresence initial={false} mode="sync">
+                <motion.div
+                  key={band + format(anchor, "yyyy-MM-dd")}
+                  initial={{ opacity: 0, scale: 0.985 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.012 }}
+                  transition={ZOOM_TRANSITION}
+                  className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden bg-[#0c0b09]"
+                >
+                  {loading && events.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-sm text-[#8a8278]">
+                      Lade…
+                    </div>
+                  ) : (
+                    <BandView
+                      band={band}
+                      anchor={anchor}
+                      events={events}
+                      dayCounts={dayCounts}
+                      onHoverDate={(d) => {
+                        hoverFocusRef.current = d;
+                      }}
+                      onZoomFinerFrom={zoomFinerFrom}
+                      onOpenDayFromYearView={openDayFromYearView}
+                      onSelect={setSelected}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </motion.div>
         </div>
 
-        {band === "year" ? (
-          <aside className="relative hidden w-full shrink-0 border-t border-[#2a2622] md:block md:w-[17rem] md:border-t-0 md:border-l md:border-[#2a2622] md:bg-[#0c0b09]/40 md:pl-3 md:pr-2 md:pt-3">
+        <motion.div
+          className="relative hidden shrink-0 overflow-hidden md:block"
+          initial={false}
+          animate={{
+            maxWidth: band === "year" ? "17rem" : 0,
+            opacity: band === "year" ? 1 : 0,
+            pointerEvents: band === "year" ? "auto" : "none",
+          }}
+          transition={ZOOM_TRANSITION}
+          aria-hidden={band !== "year"}
+        >
+          <aside className="relative w-[17rem] shrink-0 border-t border-[#2a2622] md:border-t-0 md:border-l md:border-[#2a2622] md:bg-[#0c0b09]/40 md:pl-3 md:pr-2 md:pt-3">
             <div
               className="pointer-events-none absolute inset-y-0 left-0 hidden w-px md:block"
               style={{
@@ -524,7 +545,7 @@ export function CalendarApp() {
               </ul>
             </div>
           </aside>
-        ) : null}
+        </motion.div>
       </div>
 
       <AnimatePresence>
@@ -816,8 +837,7 @@ function BandView({
                 className="mb-0.5 shrink-0 text-left"
               >
                 <span className="text-[length:clamp(9px,1.45vmin,12px)] font-medium text-[#f0a046]">
-                  {format(m, "MMM", { locale: de })}{" "}
-                  <span className="text-[#8a8278]">{format(m, "yyyy")}</span>
+                  {format(m, "MMM", { locale: de })}
                 </span>
               </button>
               <YearMiniMonthGrid
@@ -844,24 +864,45 @@ function BandView({
     const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
     const weeks = chunk(days, 7);
     const mk = format(anchor, "yyyy-MM");
+    const today = startOfDay(new Date());
+    /** Muss mit Tageszeile und Termin-Balken identisch sein — sonst verschieben sich die Spalten. */
+    const monthColGap = "gap-1";
+
     return (
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden pr-0.5"
         onPointerLeave={() => onHoverDate(null)}
       >
-        <h2 className="mb-1 shrink-0 font-[family-name:var(--font-display)] text-base text-[#f4eee6] sm:text-lg">
-          <span className="text-[#f4eee6]">{format(anchor, "MMMM", { locale: de })}</span>
-          <span className="ml-1.5 text-sm font-normal text-[#c4bbb0] sm:text-base">
-            {format(anchor, "yyyy")}
-          </span>
-        </h2>
-        <div className="mb-1 grid shrink-0 grid-cols-7 gap-0.5 pb-0.5 text-center text-[8px] font-medium uppercase leading-none text-[#7a7268] sm:text-[9px]">
-          {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (
-            <span key={d}>{d}</span>
+        <div className="mb-2 flex shrink-0 items-baseline gap-3 border-b border-[#2a2622]/70 pb-2">
+          <h2 className="font-[family-name:var(--font-display)] text-base font-medium tracking-tight text-[#f4eee6] sm:text-lg">
+            {format(anchor, "MMMM", { locale: de })}
+          </h2>
+          <div
+            className="hidden min-w-[2rem] flex-1 sm:block"
+            style={{
+              height: 2,
+              background: "linear-gradient(90deg, rgba(240,160,70,0.35) 0%, rgba(240,160,70,0.08) 45%, transparent 100%)",
+              borderRadius: 1,
+            }}
+            aria-hidden
+          />
+        </div>
+        <div className={`mb-2 grid shrink-0 grid-cols-7 ${monthColGap} pb-0.5`}>
+          {["Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So."].map((d, i) => (
+            <div
+              key={d}
+              className={`rounded-md border py-1.5 text-center text-[8px] font-bold uppercase leading-none tracking-wide sm:text-[9px] ${
+                i >= 5
+                  ? "border-[#4a4036]/75 bg-[#1c1815]/95 text-[#c9b8a8]"
+                  : "border-[#403830]/90 bg-[#181512]/95 text-[#d8cdc0]"
+              }`}
+            >
+              {d}
+            </div>
           ))}
         </div>
         <div
-          className="grid min-h-0 flex-1 gap-1"
+          className="grid min-h-0 flex-1 gap-2 sm:gap-2.5"
           style={{
             gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))`,
           }}
@@ -872,11 +913,13 @@ function BandView({
             return (
               <div
                 key={wi}
-                className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-[#2a2622]/70 bg-[#141210]/30 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#3d362e]/85 bg-gradient-to-b from-[#1d1a17] via-[#151310] to-[#0f0d0b] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_6px_28px_-10px_rgba(0,0,0,0.65)] ring-1 ring-black/35 transition-[border-color,box-shadow] hover:border-[#5c4f3d]/55 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_32px_-10px_rgba(240,160,70,0.06)]"
               >
-                <div className="grid shrink-0 grid-cols-7 gap-0.5">
-                  {weekDays.map((d) => {
+                <div className={`grid shrink-0 grid-cols-7 ${monthColGap}`}>
+                  {weekDays.map((d, di) => {
                     const inM = isSameMonth(d, anchor);
+                    const isToday = inM && isSameDay(startOfDay(d), today);
+                    const weekend = di >= 5;
                     return (
                       <button
                         key={d.toISOString()}
@@ -884,14 +927,16 @@ function BandView({
                         onPointerEnter={() => onHoverDate(startOfDay(d))}
                         onPointerDown={() => onHoverDate(startOfDay(d))}
                         onClick={() => onZoomFinerFrom(d)}
-                        className={`flex h-7 max-h-7 min-h-0 flex-col items-center justify-center rounded-md border px-0 py-0.5 text-center tabular-nums transition hover:border-[#f0a046]/45 sm:h-8 sm:max-h-8 ${
+                        className={`flex h-8 max-h-8 min-h-0 flex-col items-center justify-center rounded-lg border text-center tabular-nums transition sm:h-9 sm:max-h-9 ${
                           inM
-                            ? "border-[#2a2622] bg-[#1a1816]/90"
-                            : "border-transparent bg-transparent opacity-45"
-                        }`}
+                            ? weekend
+                              ? "border-[#3d3428]/70 bg-gradient-to-b from-[#1c1815] to-[#14110f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-[#f0a046]/40"
+                              : "border-[#353028]/80 bg-gradient-to-b from-[#222018] to-[#161412] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#f0a046]/45"
+                            : "border-[#2a2622]/35 bg-[#100e0c]/50 opacity-[0.42] hover:border-[#2a2622]/50 hover:opacity-70"
+                        } ${isToday ? "ring-2 ring-inset ring-[#f0a046]/55" : ""} `}
                       >
                         <span
-                          className={`font-[family-name:var(--font-sans)] text-[11px] font-light leading-none tracking-tight sm:text-xs ${inM ? "text-[#f2ebe3]" : "text-[#90887e]"}`}
+                          className={`font-[family-name:var(--font-sans)] text-[11px] font-light leading-none tracking-tight sm:text-xs ${inM ? (isToday ? "font-medium text-[#f5c98a]" : "text-[#f2ebe3]") : "text-[#6b645c]"}`}
                         >
                           {format(d, "d")}
                         </span>
@@ -900,11 +945,11 @@ function BandView({
                   })}
                 </div>
                 {lanes.length > 0 ? (
-                  <div className="mt-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden border-t border-[#2a2622]/40 pt-1">
+                  <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-1 overflow-hidden rounded-lg bg-[#0a0908]/55 pt-1.5 shadow-[inset_0_0_0_1px_rgba(55,48,40,0.65),inset_0_4px_14px_rgba(0,0,0,0.45)]">
                     {lanes.map((lane, li) => (
                       <div
                         key={li}
-                        className="grid min-h-0 shrink-0 grid-cols-7 gap-0.5"
+                        className={`grid min-h-0 shrink-0 grid-cols-7 ${monthColGap}`}
                         style={{ minHeight: 20 }}
                       >
                         {lane.map((seg) => (
@@ -926,9 +971,12 @@ function BandView({
   const dayEvents = eventsForCalendarDay(events, anchor);
 
   return (
-    <div className="flex h-full flex-col" onPointerEnter={() => onHoverDate(startOfDay(anchor))}>
-      <h2 className="mb-2 font-[family-name:var(--font-display)] text-lg text-[#f4eee6]">
-        {format(anchor, "EEEE, d. MMMM yyyy", { locale: de })}
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[#0c0b09]"
+      onPointerEnter={() => onHoverDate(startOfDay(anchor))}
+    >
+      <h2 className="mb-2 shrink-0 font-[family-name:var(--font-display)] text-lg text-[#f4eee6]">
+        {format(anchor, "EEEE, d. MMMM", { locale: de })}
       </h2>
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {dayEvents.length === 0 ? (
