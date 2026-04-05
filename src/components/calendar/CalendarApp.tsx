@@ -40,11 +40,7 @@ import { CreateEventDialog } from "./CreateEventDialog";
 import { DateTimePickerField } from "./DateTimePickerField";
 import { EventColorField } from "./EventColorField";
 
-type ScratchTodo = { id: string; text: string; done: boolean };
-
-function newTodoId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+type ScratchTodoRow = { id: string; text: string; done: boolean; createdAt: string };
 
 export function CalendarApp() {
   const router = useRouter();
@@ -98,25 +94,54 @@ export function CalendarApp() {
   const [pan, setPan] = useState(0);
   const panStart = useRef<{ x: number; active: boolean }>({ x: 0, active: false });
 
-  /** Nur im Browser — keine Termine / keine Tage, verschwindet nach Reload. */
-  const [scratchTodos, setScratchTodos] = useState<ScratchTodo[]>([]);
+  const [scratchTodos, setScratchTodos] = useState<ScratchTodoRow[]>([]);
   const [todoDraft, setTodoDraft] = useState("");
+  const [todosLoading, setTodosLoading] = useState(false);
 
-  const addScratchTodo = () => {
+  const loadTodos = useCallback(async () => {
+    setTodosLoading(true);
+    try {
+      const r = await fetch("/api/todos", { credentials: "include" });
+      if (!r.ok) return;
+      const d = (await r.json()) as { todos?: ScratchTodoRow[] };
+      setScratchTodos(d.todos ?? []);
+    } finally {
+      setTodosLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTodos();
+  }, [loadTodos]);
+
+  const addScratchTodo = async () => {
     const t = todoDraft.trim();
     if (!t) return;
-    setScratchTodos((prev) => [...prev, { id: newTodoId(), text: t, done: false }]);
-    setTodoDraft("");
+    const r = await fetch("/api/todos", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: t }),
+    });
+    if (r.ok) {
+      setTodoDraft("");
+      void loadTodos();
+    }
   };
 
-  const toggleScratchTodo = (id: string) => {
-    setScratchTodos((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, done: !x.done } : x)),
-    );
+  const toggleScratchTodo = async (id: string, done: boolean) => {
+    const r = await fetch(`/api/todos/${id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done: !done }),
+    });
+    if (r.ok) void loadTodos();
   };
 
-  const removeScratchTodo = (id: string) => {
-    setScratchTodos((prev) => prev.filter((x) => x.id !== id));
+  const removeScratchTodo = async (id: string) => {
+    const r = await fetch(`/api/todos/${id}`, { method: "DELETE", credentials: "include" });
+    if (r.ok) void loadTodos();
   };
 
   /**
@@ -351,7 +376,7 @@ export function CalendarApp() {
           <motion.div
             animate={{ x: pan * 0.15 }}
             transition={{ type: "spring", stiffness: 420, damping: 38 }}
-            className="h-full p-4"
+            className={`flex h-full min-h-0 flex-col p-2 sm:p-3 ${band === "year" ? "overflow-hidden" : ""}`}
           >
             <AnimatePresence mode="wait">
               <motion.div
@@ -360,7 +385,7 @@ export function CalendarApp() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.012 }}
                 transition={{ duration: 0.22 }}
-                className="h-full"
+                className={`min-h-0 w-full ${band === "year" ? "flex flex-1 flex-col overflow-hidden" : "h-full"}`}
               >
                 {loading && events.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-[#8a8278]">
@@ -386,78 +411,118 @@ export function CalendarApp() {
         </div>
 
         {band === "year" ? (
-          <aside className="hidden w-full shrink-0 border-t border-[#2a2622] p-3 md:block md:w-60 md:border-t-0 md:border-l md:pl-2">
-            <p className="mb-2 border-b border-[#2a2622]/80 pb-2 text-[11px] font-medium uppercase tracking-wide text-[#a0988c]">
-              To-Do
-            </p>
-            <p className="mb-2 text-[10px] leading-snug text-[#6b645c]">
-              Einfügbare Aufgaben · nur diese Sitzung · kein Kalender
-            </p>
-            <div className="mb-2 flex gap-1.5">
-              <input
-                value={todoDraft}
-                onChange={(e) => setTodoDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addScratchTodo();
-                  }
-                }}
-                placeholder="Eintrag …"
-                className="min-w-0 flex-1 rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-1.5 text-xs text-[#e8dfd3] placeholder:text-[#4a4540] outline-none focus:border-[#f0a046]/35"
-              />
-              <button
-                type="button"
-                onClick={addScratchTodo}
-                className={btnPrimarySm}
-                title="Hinzufügen"
-              >
-                +
-              </button>
-            </div>
-            <ul className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-8rem))]">
-              {scratchTodos.length === 0 ? (
-                <li className="rounded-lg border border-[#2a2622]/60 bg-[#141210]/50 px-2 py-3 text-center text-[11px] text-[#6b645c]">
-                  Noch keine Einträge
-                </li>
-              ) : (
-                scratchTodos.map((t) => (
-                  <li key={t.id}>
-                    <div className="flex w-full items-start gap-2 rounded-lg border border-[#2a2622]/70 bg-[#161412]/90 px-2 py-2 transition hover:border-[#f0a046]/35 hover:bg-[#1c1916]">
-                      <input
-                        type="checkbox"
-                        checked={t.done}
-                        onChange={() => toggleScratchTodo(t.id)}
-                        className="mt-0.5 shrink-0"
-                        aria-label="Erledigt"
-                      />
-                      <span
-                        className="mt-0.5 w-1 shrink-0 rounded-full bg-[#8a8278]"
-                        aria-hidden
-                      />
-                      <div className="min-w-0 flex-1 text-left">
-                        <span
-                          className={`block truncate ${t.done ? "text-[#6b645c] line-through" : "font-medium text-[#e8dfd3]"}`}
-                        >
-                          {t.text}
-                        </span>
-                        <span className="mt-0.5 block text-[10px] leading-tight text-[#8a8278]">
-                          Temporär · nicht am Tag gespeichert
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeScratchTodo(t.id)}
-                        className="shrink-0 rounded px-1 text-[11px] text-[#8a8278] transition hover:bg-[#2a1818] hover:text-[#f0a0a0]"
-                        aria-label="Entfernen"
-                      >
-                        ×
-                      </button>
-                    </div>
+          <aside className="relative hidden w-full shrink-0 border-t border-[#2a2622] md:block md:w-[17rem] md:border-t-0 md:border-l md:border-[#2a2622] md:bg-[#0c0b09]/40 md:pl-3 md:pr-2 md:pt-3">
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 hidden w-px md:block"
+              style={{
+                background:
+                  "linear-gradient(180deg, transparent 0%, rgba(240,160,70,0.12) 20%, rgba(240,160,70,0.18) 50%, rgba(240,160,70,0.12) 80%, transparent 100%)",
+              }}
+              aria-hidden
+            />
+            <div className="relative rounded-xl border border-[#2a2622]/80 bg-gradient-to-b from-[#181512]/95 via-[#12100e] to-[#0e0c0a] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_12px_40px_-20px_rgba(0,0,0,0.75)]">
+              <div className="mb-3 flex items-center justify-between gap-2 border-b border-[#2a2622]/60 pb-2">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-[#a0988c]">To-Do</p>
+                <span className="rounded-full border border-[#f0a046]/25 bg-[#f0a046]/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#f0c078]">
+                  {scratchTodos.filter((x) => !x.done).length} offen
+                </span>
+              </div>
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={todoDraft}
+                  onChange={(e) => setTodoDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void addScratchTodo();
+                    }
+                  }}
+                  placeholder="Neue Aufgabe …"
+                  disabled={todosLoading}
+                  className="min-w-0 flex-1 rounded-full border border-[#2a2622] bg-[#0c0b09]/90 px-3 py-2 text-xs text-[#e8dfd3] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-[#4a4540] outline-none transition focus:border-[#f0a046]/45 focus:ring-1 focus:ring-[#f0a046]/20 disabled:opacity-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addScratchTodo()}
+                  disabled={todosLoading || !todoDraft.trim()}
+                  className={`${btnPrimarySm} shrink-0 rounded-full !px-3`}
+                  title="Hinzufügen"
+                >
+                  +
+                </button>
+              </div>
+              <ul className="max-h-40 space-y-2 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-9rem))]">
+                {todosLoading && scratchTodos.length === 0 ? (
+                  <li className="rounded-xl border border-[#2a2622]/50 bg-[#141210]/40 px-3 py-4 text-center text-[11px] text-[#6b645c]">
+                    Lade…
                   </li>
-                ))
-              )}
-            </ul>
+                ) : scratchTodos.length === 0 ? (
+                  <li className="rounded-xl border border-dashed border-[#2a2622]/70 bg-[#0c0b09]/50 px-3 py-6 text-center text-[11px] leading-relaxed text-[#6b645c]">
+                    Noch nichts auf der Liste — oben eintragen.
+                  </li>
+                ) : (
+                  scratchTodos.map((t) => (
+                    <li key={t.id}>
+                      <div
+                        className={`group relative overflow-hidden rounded-xl border px-2.5 py-2.5 transition ${
+                          t.done
+                            ? "border-[#2a2622]/50 bg-[#10100e]/80 opacity-80"
+                            : "border-[#2a2622]/70 bg-[#161412]/90 shadow-[0_0_0_1px_rgba(240,160,70,0.06)] hover:border-[#f0a046]/30 hover:shadow-[0_4px_20px_-12px_rgba(240,160,70,0.25)]"
+                        }`}
+                      >
+                        <div
+                          className={`absolute inset-y-1 left-0 w-0.5 rounded-full transition ${
+                            t.done ? "bg-[#4a4540]" : "bg-gradient-to-b from-[#f5b45a] to-[#c9781a]"
+                          }`}
+                          aria-hidden
+                        />
+                        <div className="flex items-start gap-2 pl-1.5">
+                          <button
+                            type="button"
+                            role="checkbox"
+                            aria-checked={t.done}
+                            onClick={() => void toggleScratchTodo(t.id, t.done)}
+                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                              t.done
+                                ? "border-[#f0a046]/50 bg-[#f0a046]/20 text-[#f0a046]"
+                                : "border-[#5c564e] bg-[#0c0b09] hover:border-[#f0a046]/45"
+                            }`}
+                          >
+                            {t.done ? (
+                              <span className="text-[10px] font-bold leading-none" aria-hidden>
+                                ✓
+                              </span>
+                            ) : null}
+                          </button>
+                          <div className="min-w-0 flex-1 text-left">
+                            <span
+                              className={`block text-[13px] leading-snug ${
+                                t.done
+                                  ? "text-[#6b645c] line-through decoration-[#5c564e]"
+                                  : "font-medium text-[#e8dfd3]"
+                              }`}
+                            >
+                              {t.text}
+                            </span>
+                            <span className="mt-1 block text-[10px] tracking-wide text-[#5c564e]">
+                              {format(parseISO(t.createdAt), "d. MMM · HH:mm", { locale: de })}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void removeScratchTodo(t.id)}
+                            className="shrink-0 rounded-md px-1.5 py-0.5 text-[12px] text-[#5c564e] opacity-60 transition hover:bg-[#2a1818] hover:text-[#f0a0a0] md:opacity-0 md:group-hover:opacity-100"
+                            aria-label="Entfernen"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
           </aside>
         ) : null}
       </div>
@@ -594,7 +659,7 @@ function SpanningEventBar({
   );
 }
 
-/** Mini-Jahresansicht: Tageskacheln, darunter durchgehende Kapsel-Balken über mehrere Tage. */
+/** Mini-Jahresansicht: Tageskacheln + Termin-Balken. `fill`: füllt verfügbare Höhe (Jahresgitter ohne Scroll). */
 function YearMiniMonthGrid({
   monthStart,
   days,
@@ -602,6 +667,7 @@ function YearMiniMonthGrid({
   dayCounts,
   onHoverDate,
   onYearDayClick,
+  fill = false,
 }: {
   monthStart: Date;
   days: Date[];
@@ -609,17 +675,39 @@ function YearMiniMonthGrid({
   dayCounts: Map<string, number>;
   onHoverDate: (d: Date) => void;
   onYearDayClick: (d: Date) => void;
+  fill?: boolean;
 }) {
   const rows = chunk(days.slice(0, 35), 7);
   const yk = format(monthStart, "yyyy-MM");
+  const dayText = fill
+    ? "font-[family-name:var(--font-sans)] font-light leading-none tracking-tight text-[#d8cfc4] antialiased text-[length:clamp(6px,1.15vmin,11px)]"
+    : "font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased sm:text-[10px]";
+
+  const wrapCls = fill
+    ? "mt-0.5 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden pt-0.5"
+    : "mt-2 flex flex-col gap-1";
+
   return (
-    <div className="mt-2 flex flex-col gap-1">
+    <div className={wrapCls}>
       {rows.map((weekDays, rowIdx) => {
         const segs = computeWeekBarSegments(events, weekDays, `y-${yk}-r${rowIdx}`);
         const lanes = packBarLanes(segs);
         return (
-          <div key={rowIdx} className="flex flex-col gap-px">
-            <div className="grid grid-cols-7 gap-px">
+          <div
+            key={rowIdx}
+            className={
+              fill
+                ? "flex min-h-0 min-w-0 flex-1 flex-col gap-[2px] overflow-hidden"
+                : "flex flex-col gap-px"
+            }
+          >
+            <div
+              className={
+                fill
+                  ? "grid min-h-0 flex-[1] grid-cols-7 gap-px"
+                  : "grid grid-cols-7 gap-px"
+              }
+            >
               {weekDays.map((d) => {
                 const c = dayCounts.get(format(d, "yyyy-MM-dd")) ?? 0;
                 return (
@@ -630,23 +718,43 @@ function YearMiniMonthGrid({
                     onPointerEnter={() => onHoverDate(d)}
                     onPointerDown={() => onHoverDate(d)}
                     onClick={() => onYearDayClick(startOfDay(d))}
-                    className="flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/45"
+                    className={
+                      fill
+                        ? "flex h-full min-h-0 min-w-0 items-center justify-center rounded-[2px] bg-[#1f1c19] text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/40"
+                        : "flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/45"
+                    }
                   >
-                    <span className="font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased sm:text-[10px]">
-                      {format(d, "d")}
-                    </span>
+                    <span className={dayText}>{format(d, "d")}</span>
                   </button>
                 );
               })}
             </div>
             {lanes.length > 0 ? (
-              <div className="flex flex-col gap-px">
+              <div
+                className={
+                  fill
+                    ? "flex min-h-0 shrink-0 flex-col justify-end gap-px"
+                    : "flex flex-col gap-px"
+                }
+              >
                 {lanes.map((lane, li) => (
-                  <div key={li} className="grid grid-cols-7 gap-px" style={{ minHeight: 7 }}>
+                  <div
+                    key={li}
+                    className="grid grid-cols-7 gap-px"
+                    style={
+                      fill
+                        ? { height: "clamp(3px, 0.5vmin, 7px)", minHeight: 3 }
+                        : { minHeight: 7 }
+                    }
+                  >
                     {lane.map((seg) => (
                       <div
                         key={seg.id}
-                        className="h-1.5 min-h-0 self-center rounded-full border border-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]"
+                        className={
+                          fill
+                            ? "min-h-0 self-center rounded-full border border-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                            : "h-1.5 min-h-0 self-center rounded-full border border-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]"
+                        }
                         style={{
                           gridColumn: `${seg.startCol + 1} / span ${seg.span}`,
                           background: seg.color,
@@ -690,25 +798,27 @@ function BandView({
       end: endOfYear(anchor),
     });
     return (
-      <div className="grid w-full auto-rows-min grid-cols-2 content-start items-start gap-3 md:grid-cols-4">
+      <div
+        className="grid h-full min-h-0 min-w-0 w-full gap-2 sm:gap-2.5 md:gap-3 [grid-template-columns:repeat(2,minmax(0,1fr))] [grid-template-rows:repeat(6,minmax(0,1fr))] md:[grid-template-columns:repeat(4,minmax(0,1fr))] md:[grid-template-rows:repeat(3,minmax(0,1fr))]"
+      >
         {months.map((m) => {
           const days = eachDayOfInterval({ start: startOfMonth(m), end: endOfMonth(m) });
           return (
             <div
               key={m.toISOString()}
-              className="flex h-fit min-h-0 w-full min-w-0 flex-col rounded-lg border border-[#2a2622] bg-[#141210]/80 p-2 transition hover:border-[#f0a046]/40"
+              className="flex min-h-0 h-full min-w-0 flex-col overflow-hidden rounded-lg border border-[#2a2622]/90 bg-gradient-to-b from-[#1a1816]/95 to-[#141210]/90 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-[#f0a046]/35 md:p-1.5"
               onPointerEnter={() => onHoverDate(startOfMonth(m))}
               onPointerDown={() => onHoverDate(startOfMonth(m))}
             >
               <button
                 type="button"
                 onClick={() => onZoomFinerFrom(startOfMonth(m))}
-                className="flex flex-col text-left"
+                className="mb-0.5 shrink-0 text-left"
               >
-                <span className="text-xs font-medium text-[#f0a046]">
-                  {format(m, "MMM", { locale: de })}
+                <span className="text-[length:clamp(9px,1.45vmin,12px)] font-medium text-[#f0a046]">
+                  {format(m, "MMM", { locale: de })}{" "}
+                  <span className="text-[#8a8278]">{format(m, "yyyy")}</span>
                 </span>
-                <span className="text-[10px] font-medium text-[#8a8278]">{format(m, "yyyy")}</span>
               </button>
               <YearMiniMonthGrid
                 monthStart={m}
@@ -717,6 +827,7 @@ function BandView({
                 dayCounts={dayCounts}
                 onHoverDate={(d) => onHoverDate(d)}
                 onYearDayClick={onOpenDayFromYearView}
+                fill
               />
             </div>
           );

@@ -8,6 +8,13 @@
       "when": 1775169694076,
       "tag": "0000_serious_fallen_one",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775350296469,
+      "tag": "0001_strong_silver_surfer",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,26 @@ import {
 import { relations } from "drizzle-orm";
 import { user } from "./auth";
 
+/** Schnelle Aufgabenliste (Jahresansicht) — kein Kalenderbezug. */
+export const scratchTodo = pgTable(
+  "scratch_todo",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    done: boolean("done").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (t) => [index("scratch_todo_user_sort_idx").on(t.userId, t.sortOrder)],
+);
+
 export const eventFrequencyEnum = pgEnum("event_frequency", [
   "DAILY",
   "WEEKLY",
@@ -184,6 +204,10 @@ export const eventAttachment = pgTable(
   },
   (t) => [index("event_attachment_event_idx").on(t.eventId), index("event_attachment_user_idx").on(t.userId)],
 );
+
+export const scratchTodoRelations = relations(scratchTodo, ({ one }) => ({
+  user: one(user, { fields: [scratchTodo.userId], references: [user.id] }),
+}));
 
 export const tagRelations = relations(tag, ({ many }) => ({
   eventTags: many(eventTag),
