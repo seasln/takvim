@@ -100,6 +100,7 @@ export function CalendarApp() {
   const [scratchTodos, setScratchTodos] = useState<ScratchTodoRow[]>([]);
   const [todoDraft, setTodoDraft] = useState("");
   const [todosLoading, setTodosLoading] = useState(false);
+  const [todoSaveError, setTodoSaveError] = useState<string | null>(null);
 
   const loadTodos = useCallback(async () => {
     setTodosLoading(true);
@@ -120,15 +121,37 @@ export function CalendarApp() {
   const addScratchTodo = async () => {
     const t = todoDraft.trim();
     if (!t) return;
-    const r = await fetch("/api/todos", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: t }),
-    });
-    if (r.ok) {
-      setTodoDraft("");
-      void loadTodos();
+    setTodoSaveError(null);
+    try {
+      const r = await fetch("/api/todos", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: t }),
+      });
+      if (r.ok) {
+        setTodoDraft("");
+        void loadTodos();
+        return;
+      }
+      let msg = `Speichern fehlgeschlagen (${r.status})`;
+      try {
+        const errBody = (await r.json()) as {
+          error?: { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> };
+        };
+        const flat = errBody.error;
+        const fe = flat?.formErrors?.filter(Boolean);
+        if (fe?.length) msg = fe.join(" ");
+        else {
+          const first = flat?.fieldErrors && Object.values(flat.fieldErrors).flat().find(Boolean);
+          if (first) msg = String(first);
+        }
+      } catch {
+        /* ignore */
+      }
+      setTodoSaveError(msg);
+    } catch {
+      setTodoSaveError("Netzwerkfehler — bitte erneut versuchen.");
     }
   };
 
@@ -339,7 +362,7 @@ export function CalendarApp() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium text-[#e8dfd3]">{e.title}</span>
                       <span className="mt-0.5 block text-[10px] leading-tight text-[#8a8278]">
-                        {format(parseISO(e.startAt), "EEE, d. MMM · HH:mm", { locale: de })}
+                        {format(parseISO(e.startAt), "EEE, d. MMMM · HH:mm", { locale: de })}
                         {e.allDay ? " · ganztägig" : ""}
                       </span>
                     </span>
@@ -421,17 +444,7 @@ export function CalendarApp() {
           </motion.div>
         </div>
 
-        <motion.div
-          className="relative hidden shrink-0 overflow-hidden md:block"
-          initial={false}
-          animate={{
-            maxWidth: band === "year" ? "17rem" : 0,
-            opacity: band === "year" ? 1 : 0,
-            pointerEvents: band === "year" ? "auto" : "none",
-          }}
-          transition={ZOOM_TRANSITION}
-          aria-hidden={band !== "year"}
-        >
+        <div className="relative hidden w-[17rem] max-w-[17rem] shrink-0 overflow-hidden md:block">
           <aside className="relative w-[17rem] shrink-0 border-t border-[#2a2622] md:border-t-0 md:border-l md:border-[#2a2622] md:bg-[#0c0b09]/40 md:pl-3 md:pr-2 md:pt-3">
             <div
               className="pointer-events-none absolute inset-y-0 left-0 hidden w-px md:block"
@@ -451,7 +464,10 @@ export function CalendarApp() {
               <div className="mb-3 flex gap-2">
                 <input
                   value={todoDraft}
-                  onChange={(e) => setTodoDraft(e.target.value)}
+                  onChange={(e) => {
+                    setTodoDraft(e.target.value);
+                    setTodoSaveError(null);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
@@ -472,6 +488,11 @@ export function CalendarApp() {
                   +
                 </button>
               </div>
+              {todoSaveError ? (
+                <p className="mb-2 text-[10px] leading-snug text-[#e07a6e]" role="alert">
+                  {todoSaveError}
+                </p>
+              ) : null}
               <ul className="max-h-40 space-y-2 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-9rem))]">
                 {todosLoading && scratchTodos.length === 0 ? (
                   <li className="rounded-xl border border-[#2a2622]/50 bg-[#141210]/40 px-3 py-4 text-center text-[11px] text-[#6b645c]">
@@ -526,7 +547,7 @@ export function CalendarApp() {
                               {t.text}
                             </span>
                             <span className="mt-1 block text-[10px] tracking-wide text-[#5c564e]">
-                              {format(parseISO(t.createdAt), "d. MMM · HH:mm", { locale: de })}
+                              {format(parseISO(t.createdAt), "d. MMMM · HH:mm", { locale: de })}
                             </span>
                           </div>
                           <button
@@ -545,7 +566,7 @@ export function CalendarApp() {
               </ul>
             </div>
           </aside>
-        </motion.div>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -647,39 +668,6 @@ function packBarLanes(segments: WeekBarSeg[]): WeekBarSeg[][] {
   return lanes;
 }
 
-function SpanningEventBar({
-  seg,
-  onSelect,
-  compact = false,
-}: {
-  seg: WeekBarSeg;
-  onSelect: (e: CalendarEventDTO) => void;
-  /** Kompakte Zeilenhöhe für Monatsgitter (ohne Scroll). */
-  compact?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      style={{
-        gridColumn: `${seg.startCol + 1} / span ${seg.span}`,
-        background: seg.color,
-      }}
-      title={seg.title}
-      onClick={(ev) => {
-        ev.stopPropagation();
-        onSelect(seg.event);
-      }}
-      className={
-        compact
-          ? "flex h-5 max-h-5 min-h-0 items-center overflow-hidden rounded-full border border-white/15 px-1.5 text-left text-[8px] font-medium leading-none text-white shadow-sm sm:h-[22px] sm:max-h-[22px] sm:text-[9px]"
-          : "flex h-7 max-h-7 min-h-0 items-center overflow-hidden rounded-full border border-white/20 px-2.5 text-left text-[10px] font-semibold leading-tight text-white shadow-md sm:h-8 sm:max-h-8 sm:text-[11px]"
-      }
-    >
-      <span className="truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{seg.title}</span>
-    </button>
-  );
-}
-
 /** Mini-Jahresansicht: Tageskacheln + Termin-Balken. `fill`: füllt verfügbare Höhe (Jahresgitter ohne Scroll). */
 function YearMiniMonthGrid({
   monthStart,
@@ -701,8 +689,8 @@ function YearMiniMonthGrid({
   const rows = chunk(days.slice(0, 35), 7);
   const yk = format(monthStart, "yyyy-MM");
   const dayText = fill
-    ? "font-[family-name:var(--font-sans)] font-light leading-none tracking-tight text-[#d8cfc4] antialiased text-[length:clamp(6px,1.15vmin,11px)]"
-    : "font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased sm:text-[10px]";
+    ? "font-[family-name:var(--font-sans)] font-light leading-none tracking-tight text-[#d8cfc4] antialiased text-[length:clamp(6px,1.15vmin,11px)] transition-colors duration-200 ease-out group-hover:text-[#f4d4a8] group-hover:drop-shadow-[0_0_6px_rgba(240,160,70,0.35)]"
+    : "font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased transition-colors duration-200 ease-out group-hover:text-[#f4d4a8] group-hover:drop-shadow-[0_0_5px_rgba(240,160,70,0.3)] sm:text-[10px]";
 
   const wrapCls = fill
     ? "mt-0.5 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden pt-0.5"
@@ -741,8 +729,8 @@ function YearMiniMonthGrid({
                     onClick={() => onYearDayClick(startOfDay(d))}
                     className={
                       fill
-                        ? "flex h-full min-h-0 min-w-0 items-center justify-center rounded-[2px] bg-[#1f1c19] text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/40"
-                        : "flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/45"
+                        ? "group flex h-full min-h-0 min-w-0 items-center justify-center rounded-[2px] bg-[#1f1c19] text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[#2d2620] hover:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.32),inset_0_1px_0_rgba(255,210,165,0.12),inset_0_-12px_16px_-14px_rgba(240,160,70,0.08)] active:bg-[#332b22] active:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.2),inset_0_2px_8px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_rgba(240,160,70,0.5),inset_0_1px_0_rgba(255,220,180,0.15)]"
+                        : "group flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[#2d2620] hover:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.35),inset_0_1px_0_rgba(255,210,165,0.14),inset_0_-10px_14px_-12px_rgba(240,160,70,0.09)] active:bg-[#332b22] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_rgba(240,160,70,0.55),inset_0_1px_0_rgba(255,220,180,0.16)]"
                     }
                   >
                     <span className={dayText}>{format(d, "d")}</span>
@@ -836,8 +824,8 @@ function BandView({
                 onClick={() => onZoomFinerFrom(startOfMonth(m))}
                 className="mb-0.5 shrink-0 text-left"
               >
-                <span className="text-[length:clamp(9px,1.45vmin,12px)] font-medium text-[#f0a046]">
-                  {format(m, "MMM", { locale: de })}
+                <span className="line-clamp-2 min-w-0 text-left text-[length:clamp(8px,1.35vmin,11px)] font-medium leading-snug text-[#f0a046]">
+                  {format(m, "MMMM", { locale: de })}
                 </span>
               </button>
               <YearMiniMonthGrid
@@ -945,15 +933,31 @@ function BandView({
                   })}
                 </div>
                 {lanes.length > 0 ? (
-                  <div className="mt-1.5 flex min-h-0 flex-1 flex-col gap-1 overflow-hidden rounded-lg bg-[#0a0908]/55 pt-1.5 shadow-[inset_0_0_0_1px_rgba(55,48,40,0.65),inset_0_4px_14px_rgba(0,0,0,0.45)]">
+                  <div className="mt-1 flex min-h-0 shrink-0 flex-col gap-px overflow-hidden">
                     {lanes.map((lane, li) => (
                       <div
                         key={li}
-                        className={`grid min-h-0 shrink-0 grid-cols-7 ${monthColGap}`}
-                        style={{ minHeight: 20 }}
+                        className={`grid min-h-0 shrink-0 grid-cols-7 items-center ${monthColGap}`}
+                        style={{ minHeight: 11 }}
                       >
                         {lane.map((seg) => (
-                          <SpanningEventBar key={seg.id} seg={seg} onSelect={onSelect} compact />
+                          <button
+                            key={seg.id}
+                            type="button"
+                            aria-label={seg.title}
+                            title={seg.title}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              onSelect(seg.event);
+                            }}
+                            className="min-h-0 w-full max-w-full justify-self-stretch rounded-full border border-black/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#f0a046]/45"
+                            style={{
+                              gridColumn: `${seg.startCol + 1} / span ${seg.span}`,
+                              height: "clamp(3px, 0.65vmin, 6px)",
+                              minHeight: 3,
+                              background: seg.color,
+                            }}
+                          />
                         ))}
                       </div>
                     ))}

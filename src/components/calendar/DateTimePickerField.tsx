@@ -99,7 +99,7 @@ export function DateTimePickerField({
         aria-haspopup="dialog"
       >
         <span className="min-w-0 truncate font-[family-name:var(--font-sans)] tabular-nums">
-          {format(selected, "EEE, d. MMM yyyy · HH:mm", { locale: de })}
+          {format(selected, "EEE, d. MMMM yyyy · HH:mm", { locale: de })}
         </span>
         <span className="shrink-0 text-[10px] text-[#6b645c]" aria-hidden>
           ▾
