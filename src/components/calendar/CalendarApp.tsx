@@ -37,6 +37,14 @@ import {
 import { UploadDropzone } from "@/lib/uploadthing/components";
 import type { CalendarEventDTO } from "@/types/calendar";
 import { CreateEventDialog } from "./CreateEventDialog";
+import { DateTimePickerField } from "./DateTimePickerField";
+import { EventColorField } from "./EventColorField";
+
+type ScratchTodo = { id: string; text: string; done: boolean };
+
+function newTodoId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 export function CalendarApp() {
   const router = useRouter();
@@ -77,12 +85,39 @@ export function CalendarApp() {
       return next;
     });
   }, []);
+
+  /** Jahresansicht: nur bei Klick auf eine Tageszelle — nicht bei Mausrad/Pinch (die nutzen zoomFiner). */
+  const openDayFromYearView = useCallback((focus: Date) => {
+    setAnchor(snapAnchorForBand(focus, "day"));
+    setBand("day");
+  }, []);
   const [events, setEvents] = useState<CalendarEventDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<CalendarEventDTO | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [pan, setPan] = useState(0);
   const panStart = useRef<{ x: number; active: boolean }>({ x: 0, active: false });
+
+  /** Nur im Browser — keine Termine / keine Tage, verschwindet nach Reload. */
+  const [scratchTodos, setScratchTodos] = useState<ScratchTodo[]>([]);
+  const [todoDraft, setTodoDraft] = useState("");
+
+  const addScratchTodo = () => {
+    const t = todoDraft.trim();
+    if (!t) return;
+    setScratchTodos((prev) => [...prev, { id: newTodoId(), text: t, done: false }]);
+    setTodoDraft("");
+  };
+
+  const toggleScratchTodo = (id: string) => {
+    setScratchTodos((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, done: !x.done } : x)),
+    );
+  };
+
+  const removeScratchTodo = (id: string) => {
+    setScratchTodos((prev) => prev.filter((x) => x.id !== id));
+  };
 
   /**
    * Jahr(es) für den API-Zeitraum: Anker-Jahr und aktuelles Jahr — damit „Steht bevor“
@@ -341,6 +376,7 @@ export function CalendarApp() {
                       hoverFocusRef.current = d;
                     }}
                     onZoomFinerFrom={zoomFinerFrom}
+                    onOpenDayFromYearView={openDayFromYearView}
                     onSelect={setSelected}
                   />
                 )}
@@ -348,6 +384,82 @@ export function CalendarApp() {
             </AnimatePresence>
           </motion.div>
         </div>
+
+        {band === "year" ? (
+          <aside className="hidden w-full shrink-0 border-t border-[#2a2622] p-3 md:block md:w-60 md:border-t-0 md:border-l md:pl-2">
+            <p className="mb-2 border-b border-[#2a2622]/80 pb-2 text-[11px] font-medium uppercase tracking-wide text-[#a0988c]">
+              To-Do
+            </p>
+            <p className="mb-2 text-[10px] leading-snug text-[#6b645c]">
+              Einfügbare Aufgaben · nur diese Sitzung · kein Kalender
+            </p>
+            <div className="mb-2 flex gap-1.5">
+              <input
+                value={todoDraft}
+                onChange={(e) => setTodoDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addScratchTodo();
+                  }
+                }}
+                placeholder="Eintrag …"
+                className="min-w-0 flex-1 rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-1.5 text-xs text-[#e8dfd3] placeholder:text-[#4a4540] outline-none focus:border-[#f0a046]/35"
+              />
+              <button
+                type="button"
+                onClick={addScratchTodo}
+                className={btnPrimarySm}
+                title="Hinzufügen"
+              >
+                +
+              </button>
+            </div>
+            <ul className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-8rem))]">
+              {scratchTodos.length === 0 ? (
+                <li className="rounded-lg border border-[#2a2622]/60 bg-[#141210]/50 px-2 py-3 text-center text-[11px] text-[#6b645c]">
+                  Noch keine Einträge
+                </li>
+              ) : (
+                scratchTodos.map((t) => (
+                  <li key={t.id}>
+                    <div className="flex w-full items-start gap-2 rounded-lg border border-[#2a2622]/70 bg-[#161412]/90 px-2 py-2 transition hover:border-[#f0a046]/35 hover:bg-[#1c1916]">
+                      <input
+                        type="checkbox"
+                        checked={t.done}
+                        onChange={() => toggleScratchTodo(t.id)}
+                        className="mt-0.5 shrink-0"
+                        aria-label="Erledigt"
+                      />
+                      <span
+                        className="mt-0.5 w-1 shrink-0 rounded-full bg-[#8a8278]"
+                        aria-hidden
+                      />
+                      <div className="min-w-0 flex-1 text-left">
+                        <span
+                          className={`block truncate ${t.done ? "text-[#6b645c] line-through" : "font-medium text-[#e8dfd3]"}`}
+                        >
+                          {t.text}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] leading-tight text-[#8a8278]">
+                          Temporär · nicht am Tag gespeichert
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeScratchTodo(t.id)}
+                        className="shrink-0 rounded px-1 text-[11px] text-[#8a8278] transition hover:bg-[#2a1818] hover:text-[#f0a0a0]"
+                        aria-label="Entfernen"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
+          </aside>
+        ) : null}
       </div>
 
       <AnimatePresence>
@@ -489,14 +601,14 @@ function YearMiniMonthGrid({
   events,
   dayCounts,
   onHoverDate,
-  onZoomFinerFrom,
+  onYearDayClick,
 }: {
   monthStart: Date;
   days: Date[];
   events: CalendarEventDTO[];
   dayCounts: Map<string, number>;
   onHoverDate: (d: Date) => void;
-  onZoomFinerFrom: (d: Date) => void;
+  onYearDayClick: (d: Date) => void;
 }) {
   const rows = chunk(days.slice(0, 35), 7);
   const yk = format(monthStart, "yyyy-MM");
@@ -517,7 +629,7 @@ function YearMiniMonthGrid({
                     title={`${format(d, "EEEE, d. MMMM yyyy", { locale: de })}: ${c} Termin${c === 1 ? "" : "e"}`}
                     onPointerEnter={() => onHoverDate(d)}
                     onPointerDown={() => onHoverDate(d)}
-                    onClick={() => onZoomFinerFrom(d)}
+                    onClick={() => onYearDayClick(startOfDay(d))}
                     className="flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:bg-[#252220] hover:ring-1 hover:ring-[#f0a046]/45"
                   >
                     <span className="font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased sm:text-[10px]">
@@ -560,6 +672,7 @@ function BandView({
   dayCounts,
   onHoverDate,
   onZoomFinerFrom,
+  onOpenDayFromYearView,
   onSelect,
 }: {
   band: ZoomBand;
@@ -568,6 +681,7 @@ function BandView({
   dayCounts: Map<string, number>;
   onHoverDate: (d: Date | null) => void;
   onZoomFinerFrom: (focus: Date) => void;
+  onOpenDayFromYearView: (focus: Date) => void;
   onSelect: (e: CalendarEventDTO) => void;
 }) {
   if (band === "year") {
@@ -576,7 +690,7 @@ function BandView({
       end: endOfYear(anchor),
     });
     return (
-      <div className="grid w-full auto-rows-min grid-cols-3 content-start items-start gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      <div className="grid w-full auto-rows-min grid-cols-2 content-start items-start gap-3 md:grid-cols-4">
         {months.map((m) => {
           const days = eachDayOfInterval({ start: startOfMonth(m), end: endOfMonth(m) });
           return (
@@ -602,7 +716,7 @@ function BandView({
                 events={events}
                 dayCounts={dayCounts}
                 onHoverDate={(d) => onHoverDate(d)}
-                onZoomFinerFrom={onZoomFinerFrom}
+                onYearDayClick={onOpenDayFromYearView}
               />
             </div>
           );
@@ -879,8 +993,6 @@ function EventSheet({
   const disabled = event.isExpandedInstance;
   const inputCls =
     "mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-3 py-2 text-sm text-[#f4eee6] disabled:opacity-50";
-  const dtCls =
-    "mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-2 text-xs text-[#f4eee6] disabled:opacity-50";
 
   return (
     <motion.div
@@ -913,38 +1025,21 @@ function EventSheet({
               className={inputCls}
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div>
-              <label className="text-xs text-[#7a7268]">Start</label>
-              <input
-                type="datetime-local"
-                value={startStr}
-                onChange={(e) => setStartStr(e.target.value)}
-                disabled={disabled}
-                className={dtCls}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[#7a7268]">Ende</label>
-              <input
-                type="datetime-local"
-                value={endStr}
-                onChange={(e) => setEndStr(e.target.value)}
-                disabled={disabled}
-                className={dtCls}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-[#7a7268]">Farbe</label>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DateTimePickerField
+              label="Start"
+              value={startStr}
+              onChange={setStartStr}
               disabled={disabled}
-              className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-[#2a2622] bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <DateTimePickerField
+              label="Ende"
+              value={endStr}
+              onChange={setEndStr}
+              disabled={disabled}
             />
           </div>
+          <EventColorField value={color} onChange={setColor} disabled={disabled} />
         </div>
 
         <div className="mt-5 border-t border-[#2a2622]/80 pt-4">

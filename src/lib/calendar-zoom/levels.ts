@@ -12,13 +12,13 @@ export function stepZoomBand(band: ZoomBand, delta: -1 | 1): ZoomBand | null {
   return ZOOM_BAND_ORDER[n]!;
 }
 
-/** Anzeige: 33 % · 66 % · 100 %. */
-export function bandToZoomPercent(band: ZoomBand): 33 | 66 | 100 {
+/** Anzeige: 0 % · 50 % · 100 % (Jahr · Monat · Tag). */
+export function bandToZoomPercent(band: ZoomBand): 0 | 50 | 100 {
   switch (band) {
     case "year":
-      return 33;
+      return 0;
     case "month":
-      return 66;
+      return 50;
     case "day":
       return 100;
   }
