@@ -1,0 +1,16 @@
+/* Kalender-Dunkelmodus — nur .calendar-airbnb */
+.calendar-airbnb {
+  color-scheme: dark;
+  --palette-text-primary: #ececf1;
+  --palette-text-secondary: #9b9ba8;
+  --palette-border: #2e2e36;
+  --palette-surface: #16161a;
+  --palette-surface-deep: #0c0c0f;
+  --palette-bg-primary-core: #ff385c;
+  --palette-hover-tint: #222228;
+}
+
+.calendar-airbnb ::selection {
+  background: rgba(255, 56, 92, 0.35);
+  color: #ececf1;
+}

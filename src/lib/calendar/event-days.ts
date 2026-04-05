@@ -4,7 +4,7 @@ import type { CalendarEventDTO } from "@/types/calendar";
 export function resolveEventColor(e: CalendarEventDTO): string {
   const c = e.color?.trim();
   if (c && /^#[0-9A-Fa-f]{6}$/i.test(c)) return c;
-  return "#6366f1";
+  return "#ff385c";
 }
 
 /** Kalendertag [day 00:00, nächster Tag 00:00) schneidet [startAt, endAt). */

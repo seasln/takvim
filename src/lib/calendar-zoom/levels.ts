@@ -24,16 +24,17 @@ export function bandToZoomPercent(band: ZoomBand): 0 | 50 | 100 {
   }
 }
 
-/** Farbe der Zoom-Badge: grün → orange → rot. */
+/** Zoom-Badge — dunkel, scharfe Kanten, Hover-Hervorhebung. */
 export function zoomBadgeClassName(band: ZoomBand): string {
-  const base = "rounded-full border px-3 py-1 text-xs font-medium";
+  const base =
+    "rounded-none border px-3 py-1 text-xs font-semibold tabular-nums transition hover:border-[#ff385c]/45 hover:bg-[#222228]";
   switch (band) {
     case "year":
-      return `${base} border-emerald-800/55 bg-emerald-950/50 text-emerald-300`;
+      return `${base} border-[#2e2e36] bg-[#16161a] text-[#9b9ba8] hover:text-[#ececf1]`;
     case "month":
-      return `${base} border-amber-800/55 bg-amber-950/50 text-amber-300`;
+      return `${base} border-[#2e2e36] bg-[#16161a] text-[#ececf1] hover:text-[#ff8fa3]`;
     case "day":
-      return `${base} border-red-800/55 bg-red-950/50 text-red-300`;
+      return `${base} border-[#ff385c]/55 bg-[#2a151c] text-[#ff8fa3] hover:border-[#ff385c] hover:bg-[#331a22] hover:shadow-[0_0_12px_rgba(255,56,92,0.2)]`;
   }
 }
 

@@ -17,6 +17,9 @@ import { useEffect, useRef, useState } from "react";
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
 
+const UI_CARD =
+  "border border-[#2e2e36] bg-[#16161a] shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_8px_28px_rgba(0,0,0,0.55)]";
+
 function parseLocalValue(s: string): Date {
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? new Date() : d;
@@ -27,7 +30,7 @@ function toLocalValue(d: Date): string {
 }
 
 const triggerBase =
-  "mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-[#2a2622] bg-[#0c0b09] px-3 py-2.5 text-left text-sm text-[#e8dfd3] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition hover:border-[#f0a046]/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f0a046]/45 disabled:cursor-not-allowed disabled:opacity-50";
+  "mt-1 flex w-full items-center justify-between gap-2 rounded-none border border-[#3f3f48] bg-[#0c0c0f] px-3 py-2.5 text-left text-sm font-semibold text-[#ececf1] transition hover:border-[#ff385c]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff385c]/50 disabled:cursor-not-allowed disabled:opacity-50";
 
 export function DateTimePickerField({
   label,
@@ -89,7 +92,7 @@ export function DateTimePickerField({
 
   return (
     <div ref={rootRef} className="relative">
-      <label className="text-xs text-[#7a7268]">{label}</label>
+      <label className="text-xs font-semibold text-[#ececf1]">{label}</label>
       <button
         type="button"
         disabled={disabled}
@@ -98,10 +101,10 @@ export function DateTimePickerField({
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <span className="min-w-0 truncate font-[family-name:var(--font-sans)] tabular-nums">
+        <span className="min-w-0 truncate tabular-nums">
           {format(selected, "EEE, d. MMMM yyyy · HH:mm", { locale: de })}
         </span>
-        <span className="shrink-0 text-[10px] text-[#6b645c]" aria-hidden>
+        <span className="shrink-0 text-[10px] text-[#9b9ba8]" aria-hidden>
           ▾
         </span>
       </button>
@@ -110,24 +113,24 @@ export function DateTimePickerField({
         <div
           role="dialog"
           aria-label={label}
-          className="absolute left-0 top-full z-[60] mt-2 w-[min(calc(100vw-2rem),19rem)] rounded-xl border border-[#2a2622] bg-[#141210] p-3 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)]"
+          className={`absolute left-0 top-full z-[60] mt-2 w-[min(calc(100vw-2rem),19rem)] rounded-none p-3 ${UI_CARD}`}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="mb-2 flex items-center justify-between gap-1">
             <button
               type="button"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#2a2622] bg-[#0c0b09] text-sm text-[#c4bbb0] transition hover:border-[#f0a046]/40 hover:text-[#f0a046]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none border border-[#2e2e36] bg-[#1a1a1f] text-sm font-bold text-[#ececf1] transition hover:border-[#ff385c]/45 hover:bg-[#252530]"
               aria-label="Vorheriger Monat"
               onClick={() => setViewMonth((m) => addMonths(m, -1))}
             >
               ‹
             </button>
-            <span className="min-w-0 truncate text-center text-xs font-medium capitalize text-[#e8dfd3]">
+            <span className="min-w-0 truncate text-center text-xs font-semibold capitalize text-[#ececf1]">
               {format(viewMonth, "MMMM yyyy", { locale: de })}
             </span>
             <button
               type="button"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#2a2622] bg-[#0c0b09] text-sm text-[#c4bbb0] transition hover:border-[#f0a046]/40 hover:text-[#f0a046]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none border border-[#2e2e36] bg-[#1a1a1f] text-sm font-bold text-[#ececf1] transition hover:border-[#ff385c]/45 hover:bg-[#252530]"
               aria-label="Nächster Monat"
               onClick={() => setViewMonth((m) => addMonths(m, 1))}
             >
@@ -135,7 +138,7 @@ export function DateTimePickerField({
             </button>
           </div>
 
-          <div className="mb-1 grid grid-cols-7 gap-px text-center text-[9px] font-medium uppercase tracking-wide text-[#6b645c]">
+          <div className="mb-1 grid grid-cols-7 gap-px text-center text-[9px] font-semibold uppercase tracking-wide text-[#9b9ba8]">
             {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (
               <span key={d} className="py-0.5">
                 {d}
@@ -152,13 +155,11 @@ export function DateTimePickerField({
                   type="button"
                   onClick={() => pickDay(d)}
                   className={[
-                    "flex aspect-square min-h-[1.75rem] items-center justify-center rounded-md text-[11px] tabular-nums transition",
-                    inMonth ? "text-[#e8dfd3]" : "text-[#4a4540]",
-                    sel
-                      ? "bg-[#f0a046] font-semibold text-[#1a1208] shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-                      : inMonth
-                        ? "hover:bg-[#252220]"
-                        : "hover:bg-[#1a1816]/80",
+                    "flex aspect-square min-h-[1.75rem] items-center justify-center rounded-none border text-[11px] font-semibold tabular-nums transition",
+                    inMonth
+                      ? "border-[#2e2e36] bg-[#141418] text-[#ececf1] hover:border-[#ff385c]/45 hover:bg-[#252530]"
+                      : "border-[#1f1f24] bg-[#0e0e11] text-[#6b6b78] hover:border-[#3f3f48] hover:bg-[#16161a]",
+                    sel ? "border-[#ff385c] bg-[#ff385c] font-bold text-white hover:bg-[#ff5a7a]" : "",
                   ].join(" ")}
                 >
                   {format(d, "d")}
@@ -167,11 +168,13 @@ export function DateTimePickerField({
             })}
           </div>
 
-          <div className="mt-3 flex items-center gap-2 border-t border-[#2a2622]/80 pt-3">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-[#6b645c]">Zeit</span>
+          <div className="mt-3 flex items-center gap-2 border-t border-[#2e2e36] pt-3">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#9b9ba8]">
+              Zeit
+            </span>
             <select
               value={hour}
-              className="min-w-0 flex-1 rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-1.5 text-xs text-[#e8dfd3] outline-none focus:border-[#f0a046]/45"
+              className="min-w-0 flex-1 rounded-none border border-[#3f3f48] bg-[#0c0c0f] px-2 py-1.5 text-xs font-semibold text-[#ececf1] outline-none transition hover:border-[#ff385c]/35 focus:border-[#ff385c]"
               aria-label="Stunde"
               onChange={(e) => setTime(Number(e.target.value), selected.getMinutes())}
             >
@@ -181,10 +184,10 @@ export function DateTimePickerField({
                 </option>
               ))}
             </select>
-            <span className="text-[#5c564e]">:</span>
+            <span className="text-[#9b9ba8]">:</span>
             <select
               value={minute}
-              className="min-w-0 flex-1 rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-1.5 text-xs text-[#e8dfd3] outline-none focus:border-[#f0a046]/45"
+              className="min-w-0 flex-1 rounded-none border border-[#3f3f48] bg-[#0c0c0f] px-2 py-1.5 text-xs font-semibold text-[#ececf1] outline-none transition hover:border-[#ff385c]/35 focus:border-[#ff385c]"
               aria-label="Minute"
               onChange={(e) => setTime(selected.getHours(), Number(e.target.value))}
             >
@@ -196,11 +199,11 @@ export function DateTimePickerField({
             </select>
           </div>
 
-          <div className="mt-2 flex justify-end border-t border-[#2a2622]/60 pt-2">
+          <div className="mt-2 flex justify-end border-t border-[#2e2e36] pt-2">
             <button
               type="button"
               onClick={goToday}
-              className="text-[11px] font-medium text-[#f0a046] underline-offset-2 hover:underline"
+              className="text-[11px] font-semibold text-[#ff7a92] underline-offset-2 transition hover:text-[#ff8fa3] hover:underline"
             >
               Heute
             </button>

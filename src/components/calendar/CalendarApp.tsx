@@ -21,7 +21,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { btnDangerGhost, btnGhost, btnPrimary, btnPrimarySm } from "@/lib/ui/button-classes";
+import {
+  calBtnDangerGhost,
+  calBtnGhost,
+  calBtnPrimary,
+  calBtnPrimarySm,
+} from "@/lib/ui/calendar-button-classes";
 import {
   bandToZoomPercent,
   snapAnchorForBand,
@@ -44,6 +49,14 @@ import { EventColorField } from "./EventColorField";
 type ScratchTodoRow = { id: string; text: string; done: boolean; createdAt: string };
 
 const ZOOM_TRANSITION = { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const };
+
+/** Dunkelmodus: Karten + einheitlicher Hover */
+const UI_CARD =
+  "border border-[#2e2e36] bg-[#16161a] shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_4px_24px_rgba(0,0,0,0.45)]";
+const UI_HOVER =
+  "transition-[background-color,border-color,box-shadow,color] duration-150 hover:bg-[#222228] hover:border-[#ff385c]/40 hover:shadow-[0_0_0_1px_rgba(255,56,92,0.2),0_4px_20px_rgba(255,56,92,0.08)]";
+const DAY_CELL =
+  "rounded-none border border-[#2e2e36] bg-[#141418] text-center tabular-nums transition-[background-color,border-color,color] duration-150 hover:border-[#ff385c]/45 hover:bg-[#252530] hover:text-[#f4f4f8]";
 
 export function CalendarApp() {
   const router = useRouter();
@@ -292,8 +305,8 @@ export function CalendarApp() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#0c0b09] text-[#f4eee6]">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-[#2a2622] px-4 py-3">
+    <div className="flex min-h-0 flex-1 flex-col bg-[#0c0c0f] text-[#ececf1]">
+      <header className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b border-[#2e2e36] bg-[#121215] px-4 py-3">
         <div className="min-w-0 justify-self-start">
           <button
             type="button"
@@ -301,22 +314,22 @@ export function CalendarApp() {
               void load();
               router.refresh();
             }}
-            className="group rounded-md text-left transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f0a046]/40"
+            className="group rounded-none px-1 py-0.5 text-left transition hover:bg-[#222228] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff385c]/50"
             title="Aktualisieren"
           >
-            <span className="font-[family-name:var(--font-display)] text-2xl font-semibold tracking-tight text-[#f0a046] transition group-hover:text-[#f5b45a] sm:text-3xl">
+            <span className="text-2xl font-bold tracking-[-0.03em] text-[#ff5a7a] transition group-hover:text-[#ff8fa3] sm:text-3xl">
               Takvim
             </span>
           </button>
         </div>
         <p
-          className="pointer-events-none shrink-0 justify-self-center font-[family-name:var(--font-display)] text-lg font-medium tabular-nums tracking-tight text-[#a0988c] sm:text-xl"
+          className="pointer-events-none shrink-0 justify-self-center text-lg font-semibold tabular-nums tracking-[-0.02em] text-[#9b9ba8] sm:text-xl"
           aria-live="polite"
         >
           {format(anchor, "yyyy")}
         </p>
         <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 justify-self-end">
-          <button type="button" onClick={() => setCreateOpen(true)} className={btnPrimarySm}>
+          <button type="button" onClick={() => setCreateOpen(true)} className={calBtnPrimarySm}>
             + Termin
           </button>
           <span className={zoomBadgeClassName(band)}>
@@ -326,7 +339,7 @@ export function CalendarApp() {
             type="button"
             disabled={signingOut}
             onClick={() => void handleSignOut()}
-            className={btnDangerGhost}
+            className={calBtnDangerGhost}
           >
             {signingOut ? "…" : "Abmelden"}
           </button>
@@ -334,16 +347,18 @@ export function CalendarApp() {
       </header>
 
       <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-        <aside className="w-full shrink-0 border-b border-[#2a2622] p-3 md:w-60 md:border-b-0 md:border-r md:pr-2">
-          <p className="mb-2 border-b border-[#2a2622]/80 pb-2 text-[11px] font-medium uppercase tracking-wide text-[#a0988c]">
+        <aside className="w-full shrink-0 border-b border-[#2e2e36] bg-[#121215] p-3 md:w-60 md:border-b-0 md:border-r md:pr-2">
+          <p className="mb-2 border-b border-[#2e2e36] pb-2 text-[11px] font-semibold uppercase tracking-[0.32px] text-[#ececf1]">
             Steht bevor
           </p>
-          <p className="mb-2 text-[10px] leading-snug text-[#6b645c]">
+          <p className="mb-2 text-[13px] font-medium leading-snug text-[#9b9ba8]">
             {format(new Date(), "MMMM", { locale: de })}
           </p>
           <ul className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-8rem))]">
             {monthAgenda.length === 0 ? (
-              <li className="rounded-lg border border-[#2a2622]/60 bg-[#141210]/50 px-2 py-3 text-center text-[11px] text-[#6b645c]">
+              <li
+                className={`rounded-none border border-[#2e2e36] bg-[#16161a] px-2 py-3 text-center text-[11px] text-[#9b9ba8] ${UI_CARD}`}
+              >
                 Keine Termine im laufenden Monat
               </li>
             ) : (
@@ -352,7 +367,7 @@ export function CalendarApp() {
                   <button
                     type="button"
                     onClick={() => setSelected(e)}
-                    className="flex w-full gap-2 rounded-lg border border-[#2a2622]/70 bg-[#161412]/90 px-2 py-2 text-left transition hover:border-[#f0a046]/35 hover:bg-[#1c1916]"
+                    className={`flex w-full gap-2 rounded-none border border-[#2e2e36] bg-[#16161a] px-2 py-2 text-left ${UI_CARD} ${UI_HOVER}`}
                   >
                     <span
                       className="mt-0.5 w-1 shrink-0 rounded-full"
@@ -360,8 +375,8 @@ export function CalendarApp() {
                       aria-hidden
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium text-[#e8dfd3]">{e.title}</span>
-                      <span className="mt-0.5 block text-[10px] leading-tight text-[#8a8278]">
+                      <span className="block truncate font-semibold text-[#ececf1]">{e.title}</span>
+                      <span className="mt-0.5 block text-[10px] leading-tight text-[#9b9ba8]">
                         {format(parseISO(e.startAt), "EEE, d. MMMM · HH:mm", { locale: de })}
                         {e.allDay ? " · ganztägig" : ""}
                       </span>
@@ -375,7 +390,7 @@ export function CalendarApp() {
 
         <div
           ref={containerRef}
-          className="relative min-h-[420px] flex-1 touch-none overflow-hidden outline-none"
+          className="relative min-h-[420px] flex-1 touch-none overflow-hidden bg-[#0c0c0f] outline-none"
           tabIndex={0}
           onWheel={handleWheel}
           onTouchStartCapture={onTouchStartCapture}
@@ -418,10 +433,10 @@ export function CalendarApp() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 1.012 }}
                   transition={ZOOM_TRANSITION}
-                  className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden bg-[#0c0b09]"
+                  className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden bg-[#0c0c0f]"
                 >
                   {loading && events.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-sm text-[#8a8278]">
+                    <div className="flex h-full items-center justify-center text-sm font-medium text-[#9b9ba8]">
                       Lade…
                     </div>
                   ) : (
@@ -445,19 +460,19 @@ export function CalendarApp() {
         </div>
 
         <div className="relative hidden w-[17rem] max-w-[17rem] shrink-0 overflow-hidden md:block">
-          <aside className="relative w-[17rem] shrink-0 border-t border-[#2a2622] md:border-t-0 md:border-l md:border-[#2a2622] md:bg-[#0c0b09]/40 md:pl-3 md:pr-2 md:pt-3">
+          <aside className="relative w-[17rem] shrink-0 border-t border-[#2e2e36] bg-[#121215] md:border-t-0 md:border-l md:border-[#2e2e36] md:pl-3 md:pr-2 md:pt-3">
             <div
               className="pointer-events-none absolute inset-y-0 left-0 hidden w-px md:block"
               style={{
                 background:
-                  "linear-gradient(180deg, transparent 0%, rgba(240,160,70,0.12) 20%, rgba(240,160,70,0.18) 50%, rgba(240,160,70,0.12) 80%, transparent 100%)",
+                  "linear-gradient(180deg, transparent 0%, rgba(255,56,92,0.12) 20%, rgba(255,56,92,0.2) 50%, rgba(255,56,92,0.12) 80%, transparent 100%)",
               }}
               aria-hidden
             />
-            <div className="relative rounded-xl border border-[#2a2622]/80 bg-gradient-to-b from-[#181512]/95 via-[#12100e] to-[#0e0c0a] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_12px_40px_-20px_rgba(0,0,0,0.75)]">
-              <div className="mb-3 flex items-center justify-between gap-2 border-b border-[#2a2622]/60 pb-2">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[#a0988c]">To-Do</p>
-                <span className="rounded-full border border-[#f0a046]/25 bg-[#f0a046]/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#f0c078]">
+            <div className={`relative rounded-none border border-[#2e2e36] bg-[#16161a] p-3 ${UI_CARD}`}>
+              <div className="mb-3 flex items-center justify-between gap-2 border-b border-[#2e2e36] pb-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.32px] text-[#ececf1]">To-Do</p>
+                <span className="rounded-none border border-[#ff385c]/35 bg-[#2a151c] px-2 py-0.5 text-[10px] font-semibold tabular-nums text-[#ff7a92]">
                   {scratchTodos.filter((x) => !x.done).length} offen
                 </span>
               </div>
@@ -476,45 +491,45 @@ export function CalendarApp() {
                   }}
                   placeholder="Neue Aufgabe …"
                   disabled={todosLoading}
-                  className="min-w-0 flex-1 rounded-full border border-[#2a2622] bg-[#0c0b09]/90 px-3 py-2 text-xs text-[#e8dfd3] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-[#4a4540] outline-none transition focus:border-[#f0a046]/45 focus:ring-1 focus:ring-[#f0a046]/20 disabled:opacity-50"
+                  className="min-w-0 flex-1 rounded-none border border-[#3f3f48] bg-[#0c0c0f] px-3 py-2 text-xs text-[#ececf1] placeholder:text-[#6b6b78] outline-none transition hover:border-[#ff385c]/35 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/25 disabled:opacity-50"
                 />
                 <button
                   type="button"
                   onClick={() => void addScratchTodo()}
                   disabled={todosLoading || !todoDraft.trim()}
-                  className={`${btnPrimarySm} shrink-0 rounded-full !px-3`}
+                  className={`${calBtnPrimarySm} shrink-0 !h-9 !w-9 !min-w-9 !rounded-none !p-0 !text-lg leading-none`}
                   title="Hinzufügen"
                 >
                   +
                 </button>
               </div>
               {todoSaveError ? (
-                <p className="mb-2 text-[10px] leading-snug text-[#e07a6e]" role="alert">
+                <p className="mb-2 text-[10px] font-medium leading-snug text-[#ff7b7b]" role="alert">
                   {todoSaveError}
                 </p>
               ) : null}
               <ul className="max-h-40 space-y-2 overflow-y-auto pr-0.5 text-xs md:max-h-[min(28rem,calc(100vh-9rem))]">
                 {todosLoading && scratchTodos.length === 0 ? (
-                  <li className="rounded-xl border border-[#2a2622]/50 bg-[#141210]/40 px-3 py-4 text-center text-[11px] text-[#6b645c]">
+                  <li className="rounded-none border border-[#2e2e36] bg-[#16161a] px-3 py-4 text-center text-[11px] text-[#9b9ba8]">
                     Lade…
                   </li>
                 ) : scratchTodos.length === 0 ? (
-                  <li className="rounded-xl border border-dashed border-[#2a2622]/70 bg-[#0c0b09]/50 px-3 py-6 text-center text-[11px] leading-relaxed text-[#6b645c]">
+                  <li className="rounded-none border border-dashed border-[#3f3f48] bg-[#121215] px-3 py-6 text-center text-[11px] leading-relaxed text-[#9b9ba8]">
                     Noch nichts auf der Liste — oben eintragen.
                   </li>
                 ) : (
                   scratchTodos.map((t) => (
                     <li key={t.id}>
                       <div
-                        className={`group relative overflow-hidden rounded-xl border px-2.5 py-2.5 transition ${
+                        className={`group relative overflow-hidden rounded-none border px-2.5 py-2.5 transition ${UI_CARD} ${
                           t.done
-                            ? "border-[#2a2622]/50 bg-[#10100e]/80 opacity-80"
-                            : "border-[#2a2622]/70 bg-[#161412]/90 shadow-[0_0_0_1px_rgba(240,160,70,0.06)] hover:border-[#f0a046]/30 hover:shadow-[0_4px_20px_-12px_rgba(240,160,70,0.25)]"
+                            ? "border-[#2e2e36] bg-[#121215] opacity-80"
+                            : `border-[#2e2e36] bg-[#16161a] ${UI_HOVER}`
                         }`}
                       >
                         <div
                           className={`absolute inset-y-1 left-0 w-0.5 rounded-full transition ${
-                            t.done ? "bg-[#4a4540]" : "bg-gradient-to-b from-[#f5b45a] to-[#c9781a]"
+                            t.done ? "bg-[#5c5c68]" : "bg-[#ff385c]"
                           }`}
                           aria-hidden
                         />
@@ -524,10 +539,10 @@ export function CalendarApp() {
                             role="checkbox"
                             aria-checked={t.done}
                             onClick={() => void toggleScratchTodo(t.id, t.done)}
-                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-none border transition hover:border-[#ff385c] ${
                               t.done
-                                ? "border-[#f0a046]/50 bg-[#f0a046]/20 text-[#f0a046]"
-                                : "border-[#5c564e] bg-[#0c0b09] hover:border-[#f0a046]/45"
+                                ? "border-[#ff385c] bg-[#ff385c] text-white"
+                                : "border-[#3f3f48] bg-[#0c0c0f]"
                             }`}
                           >
                             {t.done ? (
@@ -540,20 +555,20 @@ export function CalendarApp() {
                             <span
                               className={`block text-[13px] leading-snug ${
                                 t.done
-                                  ? "text-[#6b645c] line-through decoration-[#5c564e]"
-                                  : "font-medium text-[#e8dfd3]"
+                                  ? "text-[#9b9ba8] line-through decoration-[#5c5c68]"
+                                  : "font-semibold text-[#ececf1]"
                               }`}
                             >
                               {t.text}
                             </span>
-                            <span className="mt-1 block text-[10px] tracking-wide text-[#5c564e]">
+                            <span className="mt-1 block text-[10px] tracking-wide text-[#9b9ba8]">
                               {format(parseISO(t.createdAt), "d. MMMM · HH:mm", { locale: de })}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => void removeScratchTodo(t.id)}
-                            className="shrink-0 rounded-md px-1.5 py-0.5 text-[12px] text-[#5c564e] opacity-60 transition hover:bg-[#2a1818] hover:text-[#f0a0a0] md:opacity-0 md:group-hover:opacity-100"
+                            className="shrink-0 rounded-none px-1.5 py-0.5 text-[12px] text-[#9b9ba8] opacity-80 transition hover:bg-[#2a1818] hover:text-[#ff8f8f] md:opacity-0 md:group-hover:opacity-100"
                             aria-label="Entfernen"
                           >
                             ×
@@ -689,8 +704,8 @@ function YearMiniMonthGrid({
   const rows = chunk(days.slice(0, 35), 7);
   const yk = format(monthStart, "yyyy-MM");
   const dayText = fill
-    ? "font-[family-name:var(--font-sans)] font-light leading-none tracking-tight text-[#d8cfc4] antialiased text-[length:clamp(6px,1.15vmin,11px)] transition-colors duration-200 ease-out group-hover:text-[#f4d4a8] group-hover:drop-shadow-[0_0_6px_rgba(240,160,70,0.35)]"
-    : "font-[family-name:var(--font-sans)] text-[9px] font-light leading-none tracking-tight text-[#d8cfc4] antialiased transition-colors duration-200 ease-out group-hover:text-[#f4d4a8] group-hover:drop-shadow-[0_0_5px_rgba(240,160,70,0.3)] sm:text-[10px]";
+    ? "font-medium leading-none tracking-tight text-[#9b9ba8] antialiased text-[length:clamp(6px,1.15vmin,11px)] transition-colors duration-150 ease-out group-hover:text-[#ececf1]"
+    : "text-[9px] font-medium leading-none tracking-tight text-[#9b9ba8] antialiased transition-colors duration-150 ease-out group-hover:text-[#ececf1] sm:text-[10px]";
 
   const wrapCls = fill
     ? "mt-0.5 flex min-h-0 flex-1 flex-col gap-[3px] overflow-hidden pt-0.5"
@@ -727,11 +742,11 @@ function YearMiniMonthGrid({
                     onPointerEnter={() => onHoverDate(d)}
                     onPointerDown={() => onHoverDate(d)}
                     onClick={() => onYearDayClick(startOfDay(d))}
-                    className={
+                    className={`group flex items-center justify-center ${DAY_CELL} ${
                       fill
-                        ? "group flex h-full min-h-0 min-w-0 items-center justify-center rounded-[2px] bg-[#1f1c19] text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[#2d2620] hover:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.32),inset_0_1px_0_rgba(255,210,165,0.12),inset_0_-12px_16px_-14px_rgba(240,160,70,0.08)] active:bg-[#332b22] active:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.2),inset_0_2px_8px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_rgba(240,160,70,0.5),inset_0_1px_0_rgba(255,220,180,0.15)]"
-                        : "group flex aspect-square flex-col items-center justify-center rounded-[3px] bg-[#1f1c19] px-0.5 text-center tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,box-shadow] duration-200 ease-out hover:bg-[#2d2620] hover:shadow-[inset_0_0_0_1px_rgba(240,160,70,0.35),inset_0_1px_0_rgba(255,210,165,0.14),inset_0_-10px_14px_-12px_rgba(240,160,70,0.09)] active:bg-[#332b22] focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_2px_rgba(240,160,70,0.55),inset_0_1px_0_rgba(255,220,180,0.16)]"
-                    }
+                        ? "h-full min-h-0 min-w-0"
+                        : "aspect-square flex-col px-0.5"
+                    } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff385c]/35`}
                   >
                     <span className={dayText}>{format(d, "d")}</span>
                   </button>
@@ -761,8 +776,8 @@ function YearMiniMonthGrid({
                         key={seg.id}
                         className={
                           fill
-                            ? "min-h-0 self-center rounded-full border border-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
-                            : "h-1.5 min-h-0 self-center rounded-full border border-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]"
+                            ? "min-h-0 self-center rounded-full border border-black/10 shadow-sm"
+                            : "h-1.5 min-h-0 self-center rounded-full border border-black/10 shadow-sm"
                         }
                         style={{
                           gridColumn: `${seg.startCol + 1} / span ${seg.span}`,
@@ -815,16 +830,16 @@ function BandView({
           return (
             <div
               key={m.toISOString()}
-              className="flex min-h-0 h-full min-w-0 flex-col overflow-hidden rounded-lg border border-[#2a2622]/90 bg-gradient-to-b from-[#1a1816]/95 to-[#141210]/90 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition hover:border-[#f0a046]/35 md:p-1.5"
+              className={`flex min-h-0 h-full min-w-0 flex-col overflow-hidden rounded-none border border-[#2e2e36] bg-[#16161a] p-1 transition-colors duration-150 md:p-1.5 ${UI_CARD} hover:border-[#ff385c]/35 hover:bg-[#1c1c22]`}
               onPointerEnter={() => onHoverDate(startOfMonth(m))}
               onPointerDown={() => onHoverDate(startOfMonth(m))}
             >
               <button
                 type="button"
                 onClick={() => onZoomFinerFrom(startOfMonth(m))}
-                className="mb-0.5 shrink-0 text-left"
+                className="mb-0.5 shrink-0 rounded-none px-0.5 py-0.5 text-left transition hover:bg-[#222228]"
               >
-                <span className="line-clamp-2 min-w-0 text-left text-[length:clamp(8px,1.35vmin,11px)] font-medium leading-snug text-[#f0a046]">
+                <span className="line-clamp-2 min-w-0 text-left text-[length:clamp(8px,1.35vmin,11px)] font-semibold leading-snug tracking-[-0.02em] text-[#ececf1] transition-colors hover:text-[#ff8fa3]">
                   {format(m, "MMMM", { locale: de })}
                 </span>
               </button>
@@ -861,16 +876,16 @@ function BandView({
         className="flex h-full min-h-0 flex-col overflow-hidden pr-0.5"
         onPointerLeave={() => onHoverDate(null)}
       >
-        <div className="mb-2 flex shrink-0 items-baseline gap-3 border-b border-[#2a2622]/70 pb-2">
-          <h2 className="font-[family-name:var(--font-display)] text-base font-medium tracking-tight text-[#f4eee6] sm:text-lg">
+        <div className="mb-2 flex shrink-0 items-baseline gap-3 border-b border-[#2e2e36] pb-2">
+          <h2 className="text-base font-bold tracking-[-0.03em] text-[#ececf1] sm:text-lg">
             {format(anchor, "MMMM", { locale: de })}
           </h2>
           <div
             className="hidden min-w-[2rem] flex-1 sm:block"
             style={{
               height: 2,
-              background: "linear-gradient(90deg, rgba(240,160,70,0.35) 0%, rgba(240,160,70,0.08) 45%, transparent 100%)",
-              borderRadius: 1,
+              background: "linear-gradient(90deg, rgba(255,56,92,0.45) 0%, rgba(255,56,92,0.12) 45%, transparent 100%)",
+              borderRadius: 0,
             }}
             aria-hidden
           />
@@ -879,10 +894,8 @@ function BandView({
           {["Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa.", "So."].map((d, i) => (
             <div
               key={d}
-              className={`rounded-md border py-1.5 text-center text-[8px] font-bold uppercase leading-none tracking-wide sm:text-[9px] ${
-                i >= 5
-                  ? "border-[#4a4036]/75 bg-[#1c1815]/95 text-[#c9b8a8]"
-                  : "border-[#403830]/90 bg-[#181512]/95 text-[#d8cdc0]"
+              className={`rounded-none border border-[#2e2e36] bg-[#1a1a1f] py-1.5 text-center text-[8px] font-semibold uppercase leading-none tracking-wide text-[#ececf1] transition hover:bg-[#252530] sm:text-[9px] ${
+                i >= 5 ? "bg-[#16161a] text-[#9b9ba8]" : ""
               }`}
             >
               {d}
@@ -901,7 +914,7 @@ function BandView({
             return (
               <div
                 key={wi}
-                className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#3d362e]/85 bg-gradient-to-b from-[#1d1a17] via-[#151310] to-[#0f0d0b] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_6px_28px_-10px_rgba(0,0,0,0.65)] ring-1 ring-black/35 transition-[border-color,box-shadow] hover:border-[#5c4f3d]/55 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_32px_-10px_rgba(240,160,70,0.06)]"
+                className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-none border border-[#2e2e36] bg-[#16161a] p-1.5 ${UI_CARD} ${UI_HOVER}`}
               >
                 <div className={`grid shrink-0 grid-cols-7 ${monthColGap}`}>
                   {weekDays.map((d, di) => {
@@ -915,16 +928,16 @@ function BandView({
                         onPointerEnter={() => onHoverDate(startOfDay(d))}
                         onPointerDown={() => onHoverDate(startOfDay(d))}
                         onClick={() => onZoomFinerFrom(d)}
-                        className={`flex h-8 max-h-8 min-h-0 flex-col items-center justify-center rounded-lg border text-center tabular-nums transition sm:h-9 sm:max-h-9 ${
+                        className={`flex h-8 max-h-8 min-h-0 flex-col items-center justify-center rounded-none border text-center tabular-nums sm:h-9 sm:max-h-9 ${DAY_CELL} ${
                           inM
                             ? weekend
-                              ? "border-[#3d3428]/70 bg-gradient-to-b from-[#1c1815] to-[#14110f] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-[#f0a046]/40"
-                              : "border-[#353028]/80 bg-gradient-to-b from-[#222018] to-[#161412] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#f0a046]/45"
-                            : "border-[#2a2622]/35 bg-[#100e0c]/50 opacity-[0.42] hover:border-[#2a2622]/50 hover:opacity-70"
-                        } ${isToday ? "ring-2 ring-inset ring-[#f0a046]/55" : ""} `}
+                              ? "border-[#2e2e36] bg-[#141418]"
+                              : "border-[#2e2e36] bg-[#18181c]"
+                            : "border-[#1f1f24] bg-[#0e0e11] opacity-55 hover:opacity-90"
+                        } ${isToday ? "ring-2 ring-inset ring-[#ff385c]/60" : ""} `}
                       >
                         <span
-                          className={`font-[family-name:var(--font-sans)] text-[11px] font-light leading-none tracking-tight sm:text-xs ${inM ? (isToday ? "font-medium text-[#f5c98a]" : "text-[#f2ebe3]") : "text-[#6b645c]"}`}
+                          className={`text-[11px] font-semibold leading-none tracking-tight sm:text-xs ${inM ? (isToday ? "text-[#ff7a92]" : "text-[#ececf1]") : "text-[#6b6b78]"}`}
                         >
                           {format(d, "d")}
                         </span>
@@ -950,7 +963,7 @@ function BandView({
                               ev.stopPropagation();
                               onSelect(seg.event);
                             }}
-                            className="min-h-0 w-full max-w-full justify-self-stretch rounded-full border border-black/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] outline-none transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#f0a046]/45"
+                            className="min-h-0 w-full max-w-full justify-self-stretch rounded-none border border-white/10 outline-none transition hover:brightness-110 hover:ring-1 hover:ring-[#ff385c]/40 focus-visible:ring-2 focus-visible:ring-[#ff385c]/45"
                             style={{
                               gridColumn: `${seg.startCol + 1} / span ${seg.span}`,
                               height: "clamp(3px, 0.65vmin, 6px)",
@@ -976,15 +989,15 @@ function BandView({
 
   return (
     <div
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[#0c0b09]"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-[#0c0c0f]"
       onPointerEnter={() => onHoverDate(startOfDay(anchor))}
     >
-      <h2 className="mb-2 shrink-0 font-[family-name:var(--font-display)] text-lg text-[#f4eee6]">
+      <h2 className="mb-2 shrink-0 text-lg font-bold tracking-[-0.03em] text-[#ececf1]">
         {format(anchor, "EEEE, d. MMMM", { locale: de })}
       </h2>
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
         {dayEvents.length === 0 ? (
-          <p className="text-sm text-[#7a7268]">Keine Termine an diesem Tag.</p>
+          <p className="text-sm font-medium text-[#9b9ba8]">Keine Termine an diesem Tag.</p>
         ) : (
           dayEvents.map((e) => (
             <DayEventRow key={e.id} event={e} detailed onOpen={() => onSelect(e)} />
@@ -1008,20 +1021,20 @@ function DayEventRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-start gap-3 rounded-lg border border-[#2a2622] bg-[#141210] p-3 text-left transition hover:border-[#f0a046]/35"
+      className={`flex w-full items-start gap-3 rounded-none border border-[#2e2e36] bg-[#16161a] p-3 text-left ${UI_CARD} ${UI_HOVER}`}
     >
       <div
         className="mt-0.5 h-10 w-1 shrink-0 rounded-full"
         style={{ background: resolveEventColor(event) }}
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-[#f4eee6]">{event.title}</p>
-        <p className="text-xs text-[#9a928a]">
+        <p className="truncate text-sm font-semibold text-[#ececf1]">{event.title}</p>
+        <p className="text-xs font-medium text-[#9b9ba8]">
           {format(parseISO(event.startAt), "HH:mm")} – {format(parseISO(event.endAt), "HH:mm")}
           {event.isExpandedInstance && " · Serie"}
         </p>
         {detailed && event.description && (
-          <p className="mt-1 line-clamp-3 text-xs text-[#b5ada4]">{event.description}</p>
+          <p className="mt-1 line-clamp-3 text-xs text-[#9b9ba8]">{event.description}</p>
         )}
       </div>
     </button>
@@ -1154,12 +1167,11 @@ function EventSheet({
   };
 
   const disabled = event.isExpandedInstance;
-  const inputCls =
-    "mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-3 py-2 text-sm text-[#f4eee6] disabled:opacity-50";
+  const inputCls = `mt-1 w-full rounded-none border border-[#3f3f48] bg-[#0c0c0f] px-3 py-2 text-sm text-[#ececf1] outline-none transition hover:border-[#ff385c]/35 focus:border-[#ff385c] focus:ring-2 focus:ring-[#ff385c]/25 disabled:opacity-50`;
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1169,18 +1181,18 @@ function EventSheet({
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 20, opacity: 0 }}
-        className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[#2a2622] bg-[#141210] p-5 shadow-2xl"
+        className={`max-h-[90vh] w-full max-w-lg overflow-auto rounded-none border border-[#2e2e36] bg-[#16161a] p-5 ${UI_CARD}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-2">
-          <h3 className="font-[family-name:var(--font-display)] text-lg text-[#f0a046]">Termin</h3>
-          <button type="button" onClick={onClose} className={`${btnGhost} !px-2 !py-1 !text-xs`}>
+          <h3 className="text-lg font-bold tracking-[-0.03em] text-[#ececf1]">Termin</h3>
+          <button type="button" onClick={onClose} className={`${calBtnGhost} !px-2 !py-1 !text-xs`}>
             Schließen
           </button>
         </div>
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-[#7a7268]">Titel</label>
+            <label className="text-xs font-semibold text-[#ececf1]">Titel</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -1205,45 +1217,45 @@ function EventSheet({
           <EventColorField value={color} onChange={setColor} disabled={disabled} />
         </div>
 
-        <div className="mt-5 border-t border-[#2a2622]/80 pt-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wider text-[#7a7268]">Dateien</p>
-          <p className="mb-3 text-[11px] leading-snug text-[#6b645c]">
+        <div className="mt-5 border-t border-[#2e2e36] pt-4">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#ececf1]">Dateien</p>
+          <p className="mb-3 text-[11px] leading-snug text-[#9b9ba8]">
             Vorhandene Anhänge und neue Uploads (ziehen oder klicken). Der Kalender aktualisiert sich nach dem
             Upload.
           </p>
           {attLoading && attachments.length === 0 ? (
-            <p className="text-xs text-[#8a8278]">Lade Anhänge…</p>
+            <p className="text-xs font-medium text-[#9b9ba8]">Lade Anhänge…</p>
           ) : attachments.length > 0 ? (
-            <ul className="mb-3 space-y-1.5 rounded-lg border border-[#2a2622]/70 bg-[#0c0b09]/80 p-2">
+            <ul className="mb-3 space-y-1.5 rounded-none border border-[#2e2e36] bg-[#121215] p-2">
               {attachments.map((a) => (
                 <li key={a.id}>
                   <a
                     href={a.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 rounded-md px-1 py-1 text-xs text-[#c4bbb0] transition hover:bg-[#1a1816] hover:text-[#f0a046]"
+                    className="flex items-center gap-2 rounded-none px-1 py-1 text-xs text-[#9b9ba8] transition hover:bg-[#222228] hover:text-[#ff8fa3]"
                   >
-                    <span className="truncate font-medium text-[#e8dfd3]">{a.name}</span>
+                    <span className="truncate font-semibold text-[#ececf1]">{a.name}</span>
                     {a.mimeType?.startsWith("image/") ? (
-                      <span className="shrink-0 text-[10px] text-[#6b645c]">Bild</span>
+                      <span className="shrink-0 text-[10px] text-[#6b6b78]">Bild</span>
                     ) : null}
                   </a>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mb-3 text-xs text-[#6b645c]">Noch keine Dateien.</p>
+            <p className="mb-3 text-xs text-[#9b9ba8]">Noch keine Dateien.</p>
           )}
           {!disabled ? (
             <UploadDropzone
               endpoint="eventAttachment"
               appearance={{
                 container:
-                  "group flex min-h-[112px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#3d3830] bg-[#0c0b09]/90 px-4 py-5 transition hover:border-[#f0a046]/55 hover:bg-[#12100e]",
-                label: "text-sm font-medium text-[#c4bbb0] group-hover:text-[#e8dfd3]",
-                allowedContent: "text-[11px] text-[#6b645c]",
+                  "group flex min-h-[112px] cursor-pointer flex-col items-center justify-center gap-2 rounded-none border-2 border-dashed border-[#3f3f48] bg-[#121215] px-4 py-5 transition hover:border-[#ff385c]/55 hover:bg-[#1f1418]",
+                label: "text-sm font-semibold text-[#ececf1] group-hover:text-[#ff8fa3]",
+                allowedContent: "text-[11px] text-[#9b9ba8]",
                 button:
-                  "rounded-lg border border-[#2a2622] bg-[#1a1816] px-3 py-1.5 text-xs font-medium text-[#f0a046] transition hover:bg-[#252220]",
+                  "rounded-none border border-[#2e2e36] bg-[#16161a] px-3 py-1.5 text-xs font-semibold text-[#ff7a92] transition hover:border-[#ff385c]/50 hover:bg-[#222228]",
               }}
               content={{
                 label: "Dateien hierher ziehen",
@@ -1269,20 +1281,20 @@ function EventSheet({
               }}
             />
           ) : (
-            <p className="text-xs text-[#7a7268]">Anhänge zur Serie am Serien-Termin bearbeiten.</p>
+            <p className="text-xs text-[#9b9ba8]">Anhänge zur Serie am Serien-Termin bearbeiten.</p>
           )}
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
           {!disabled && (
             <>
-              <button type="button" onClick={() => void save()} className={btnPrimary}>
+              <button type="button" onClick={() => void save()} className={calBtnPrimary}>
                 Speichern
               </button>
               <button
                 type="button"
                 onClick={() => setDel(true)}
-                className="inline-flex cursor-pointer items-center justify-center rounded-full border border-[#7a3333] px-4 py-2 text-sm text-[#f0a0a0] transition hover:bg-[#2a1818] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f0a0a0]/50"
+                className="inline-flex cursor-pointer items-center justify-center rounded-none border border-[#ff6b6b]/40 bg-[#16161a] px-4 py-2 text-sm font-semibold text-[#ff8f8f] transition hover:bg-[#2a1818] hover:border-[#ff6b6b]/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6b6b]/50"
               >
                 Löschen
               </button>
@@ -1290,20 +1302,20 @@ function EventSheet({
           )}
         </div>
         {del && (
-          <div className="mt-4 rounded-lg border border-[#5c2a2a] bg-[#1f1414] p-3 text-sm">
-            <p className="text-[#f0a0a0]">Wirklich löschen?</p>
+          <div className="mt-4 rounded-none border border-[#5c2a2a] bg-[#1f1414] p-3 text-sm">
+            <p className="font-semibold text-[#ff8f8f]">Wirklich löschen?</p>
             <div className="mt-2 flex gap-2">
               <button
                 type="button"
                 onClick={() => void remove()}
-                className="cursor-pointer rounded-md bg-[#7a2222] px-3 py-1 text-xs text-white transition hover:bg-[#922a2a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                className="cursor-pointer rounded-none bg-[#c13515] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#e04530] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#ff385c]"
               >
                 Ja
               </button>
               <button
                 type="button"
                 onClick={() => setDel(false)}
-                className="cursor-pointer rounded-md border border-[#2a2622] px-3 py-1 text-xs transition hover:bg-[#1f1c19] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                className="cursor-pointer rounded-none border border-[#3f3f48] bg-[#16161a] px-3 py-1.5 text-xs font-semibold text-[#ececf1] transition hover:border-[#ff385c]/40 hover:bg-[#222228] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
               >
                 Nein
               </button>
