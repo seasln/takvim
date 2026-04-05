@@ -57,3 +57,28 @@ input[type="radio"] {
     animation: none;
   }
 }
+
+/* Subtle shifting “white noise” / analog static over the poster (seamless tile) */
+@keyframes marketing-noise-pan {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 256px 256px;
+  }
+}
+
+.hero-dragon-noise-fine {
+  animation: marketing-noise-pan 22s linear infinite;
+}
+
+.hero-dragon-noise-coarse {
+  animation: marketing-noise-pan 31s linear infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-dragon-noise-fine,
+  .hero-dragon-noise-coarse {
+    animation: none;
+  }
+}
