@@ -36,3 +36,24 @@ input[type="checkbox"],
 input[type="radio"] {
   cursor: pointer;
 }
+
+/* Marketing / Auth: cinematic hero background drift (American Dragon poster) */
+@keyframes marketing-dragon-drift {
+  0%,
+  100% {
+    transform: scale(1.06) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.1) translate3d(-0.6%, 0.35%, 0);
+  }
+}
+
+.hero-dragon-photo {
+  animation: marketing-dragon-drift 32s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-dragon-photo {
+    animation: none;
+  }
+}

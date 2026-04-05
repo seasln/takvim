@@ -34,7 +34,7 @@ import {
   eventIntersectsCalendarDay,
   resolveEventColor,
 } from "@/lib/calendar/event-days";
-import { UploadButton } from "@/lib/uploadthing/components";
+import { UploadDropzone } from "@/lib/uploadthing/components";
 import type { CalendarEventDTO } from "@/types/calendar";
 import { CreateEventDialog } from "./CreateEventDialog";
 
@@ -365,6 +365,7 @@ export function CalendarApp() {
         {selected && (
           <EventSheet
             event={selected}
+            reloadCalendar={() => void load()}
             onClose={() => setSelected(null)}
             onSaved={() => {
               void load();
@@ -575,13 +576,13 @@ function BandView({
       end: endOfYear(anchor),
     });
     return (
-      <div className="grid h-full grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+      <div className="grid w-full auto-rows-min grid-cols-3 content-start items-start gap-3 sm:grid-cols-4 lg:grid-cols-6">
         {months.map((m) => {
           const days = eachDayOfInterval({ start: startOfMonth(m), end: endOfMonth(m) });
           return (
             <div
               key={m.toISOString()}
-              className="flex flex-col rounded-lg border border-[#2a2622] bg-[#141210]/80 p-2 transition hover:border-[#f0a046]/40"
+              className="flex h-fit min-h-0 w-full min-w-0 flex-col rounded-lg border border-[#2a2622] bg-[#141210]/80 p-2 transition hover:border-[#f0a046]/40"
               onPointerEnter={() => onHoverDate(startOfMonth(m))}
               onPointerDown={() => onHoverDate(startOfMonth(m))}
             >
@@ -750,31 +751,123 @@ function DayEventRow({
   );
 }
 
+function toDatetimeLocalValue(iso: string): string {
+  const d = parseISO(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
+type SheetAttachment = {
+  id: string;
+  url: string;
+  name: string;
+  mimeType: string | null;
+  createdAt: string;
+};
+
 function EventSheet({
   event,
+  reloadCalendar,
   onClose,
   onSaved,
 }: {
   event: CalendarEventDTO;
+  reloadCalendar: () => void;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const realId = event.isExpandedInstance ? event.masterId! : event.id;
   const [title, setTitle] = useState(event.title);
+  const [startStr, setStartStr] = useState(() => toDatetimeLocalValue(event.startAt));
+  const [endStr, setEndStr] = useState(() => toDatetimeLocalValue(event.endAt));
+  const [color, setColor] = useState(() => resolveEventColor(event));
   const [del, setDel] = useState(false);
+  const [attachments, setAttachments] = useState<SheetAttachment[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
+
+  useEffect(() => {
+    setTitle(event.title);
+    setStartStr(toDatetimeLocalValue(event.startAt));
+    setEndStr(toDatetimeLocalValue(event.endAt));
+    setColor(resolveEventColor(event));
+    setDel(false);
+  }, [
+    event.id,
+    event.title,
+    event.startAt,
+    event.endAt,
+    event.color,
+    event.isExpandedInstance,
+  ]);
+
+  const fetchAttachments = useCallback(async () => {
+    setAttLoading(true);
+    try {
+      const r = await fetch(`/api/attachments?eventId=${encodeURIComponent(realId)}`, {
+        credentials: "include",
+      });
+      if (!r.ok) return;
+      const d = (await r.json()) as { attachments?: SheetAttachment[] };
+      setAttachments(d.attachments ?? []);
+    } finally {
+      setAttLoading(false);
+    }
+  }, [realId]);
+
+  useEffect(() => {
+    void fetchAttachments();
+  }, [fetchAttachments]);
 
   const save = async () => {
     if (event.isExpandedInstance) {
       alert("Serientermine hier nur über den Master bearbeitbar.");
       return;
     }
+    const startAt = new Date(startStr);
+    const endAt = new Date(endStr);
+    if (Number.isNaN(+startAt) || Number.isNaN(+endAt)) {
+      alert("Ungültiges Datum oder Uhrzeit.");
+      return;
+    }
+    if (endAt <= startAt) {
+      alert("Ende muss nach dem Start liegen.");
+      return;
+    }
+    let hex = color.trim();
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) hex = resolveEventColor(event);
     const res = await fetch(`/api/events/${event.id}`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({
+        title: title.trim() || "Ohne Titel",
+        startAt: startAt.toISOString(),
+        endAt: endAt.toISOString(),
+        color: hex,
+      }),
     });
-    if (res.ok) onSaved();
+    if (res.ok) {
+      onSaved();
+      return;
+    }
+    if (res.status === 409) {
+      alert(
+        "Dieser Termin ist eine Serie (Master). Verschieben und einige Änderungen sind dafür noch nicht freigeschaltet.",
+      );
+      return;
+    }
+    let msg = "Speichern fehlgeschlagen.";
+    try {
+      const err = (await res.json()) as { error?: unknown };
+      if (typeof err.error === "string") msg = err.error;
+    } catch {
+      /* ignore */
+    }
+    alert(msg);
   };
 
   const remove = async () => {
@@ -782,6 +875,12 @@ function EventSheet({
     const res = await fetch(`/api/events/${event.id}`, { method: "DELETE", credentials: "include" });
     if (res.ok) onSaved();
   };
+
+  const disabled = event.isExpandedInstance;
+  const inputCls =
+    "mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-3 py-2 text-sm text-[#f4eee6] disabled:opacity-50";
+  const dtCls =
+    "mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-2 py-2 text-xs text-[#f4eee6] disabled:opacity-50";
 
   return (
     <motion.div
@@ -804,22 +903,95 @@ function EventSheet({
             Schließen
           </button>
         </div>
-        <label className="block text-xs text-[#7a7268]">Titel</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          disabled={event.isExpandedInstance}
-          className="mt-1 w-full rounded-lg border border-[#2a2622] bg-[#0c0b09] px-3 py-2 text-sm text-[#f4eee6] disabled:opacity-50"
-        />
-        <p className="mt-3 text-xs text-[#8a8278]">
-          {format(parseISO(event.startAt), "Pp", { locale: de })} →{" "}
-          {format(parseISO(event.endAt), "Pp", { locale: de })}
-        </p>
-        {!event.isExpandedInstance && (
-          <div className="mt-4">
-            <p className="mb-2 text-xs uppercase tracking-wider text-[#7a7268]">Anhänge</p>
-            <UploadButton
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-[#7a7268]">Titel</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={disabled}
+              className={inputCls}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <label className="text-xs text-[#7a7268]">Start</label>
+              <input
+                type="datetime-local"
+                value={startStr}
+                onChange={(e) => setStartStr(e.target.value)}
+                disabled={disabled}
+                className={dtCls}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-[#7a7268]">Ende</label>
+              <input
+                type="datetime-local"
+                value={endStr}
+                onChange={(e) => setEndStr(e.target.value)}
+                disabled={disabled}
+                className={dtCls}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-[#7a7268]">Farbe</label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              disabled={disabled}
+              className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-[#2a2622] bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-[#2a2622]/80 pt-4">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wider text-[#7a7268]">Dateien</p>
+          <p className="mb-3 text-[11px] leading-snug text-[#6b645c]">
+            Vorhandene Anhänge und neue Uploads (ziehen oder klicken). Der Kalender aktualisiert sich nach dem
+            Upload.
+          </p>
+          {attLoading && attachments.length === 0 ? (
+            <p className="text-xs text-[#8a8278]">Lade Anhänge…</p>
+          ) : attachments.length > 0 ? (
+            <ul className="mb-3 space-y-1.5 rounded-lg border border-[#2a2622]/70 bg-[#0c0b09]/80 p-2">
+              {attachments.map((a) => (
+                <li key={a.id}>
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 rounded-md px-1 py-1 text-xs text-[#c4bbb0] transition hover:bg-[#1a1816] hover:text-[#f0a046]"
+                  >
+                    <span className="truncate font-medium text-[#e8dfd3]">{a.name}</span>
+                    {a.mimeType?.startsWith("image/") ? (
+                      <span className="shrink-0 text-[10px] text-[#6b645c]">Bild</span>
+                    ) : null}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mb-3 text-xs text-[#6b645c]">Noch keine Dateien.</p>
+          )}
+          {!disabled ? (
+            <UploadDropzone
               endpoint="eventAttachment"
+              appearance={{
+                container:
+                  "group flex min-h-[112px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-[#3d3830] bg-[#0c0b09]/90 px-4 py-5 transition hover:border-[#f0a046]/55 hover:bg-[#12100e]",
+                label: "text-sm font-medium text-[#c4bbb0] group-hover:text-[#e8dfd3]",
+                allowedContent: "text-[11px] text-[#6b645c]",
+                button:
+                  "rounded-lg border border-[#2a2622] bg-[#1a1816] px-3 py-1.5 text-xs font-medium text-[#f0a046] transition hover:bg-[#252220]",
+              }}
+              content={{
+                label: "Dateien hierher ziehen",
+                allowedContent: "Bilder bis 8 MB, PDF & Dateien bis 16 MB",
+                button: "Dateien wählen",
+              }}
               onClientUploadComplete={async (res) => {
                 for (const f of res) {
                   await fetch("/api/attachments", {
@@ -834,13 +1006,17 @@ function EventSheet({
                     }),
                   });
                 }
-                onSaved();
+                await fetchAttachments();
+                reloadCalendar();
               }}
             />
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-[#7a7268]">Anhänge zur Serie am Serien-Termin bearbeiten.</p>
+          )}
+        </div>
+
         <div className="mt-6 flex flex-wrap gap-2">
-          {!event.isExpandedInstance && (
+          {!disabled && (
             <>
               <button type="button" onClick={() => void save()} className={btnPrimary}>
                 Speichern
